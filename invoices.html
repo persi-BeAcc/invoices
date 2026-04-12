@@ -1376,21 +1376,35 @@ function App() {
     setScreen("list");
   };
   var handleImport = function handleImport(invs, detectedName) {
+    var replace = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    var sort = function sort(list) {
+      return list.slice().sort(function (a, b) {
+        var na = parseInt(a.number.replace(/\D/g, "")) || 0,
+          nb = parseInt(b.number.replace(/\D/g, "")) || 0;
+        return nb - na;
+      });
+    };
+    if (detectedName && !settings.name) saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
+      name: detectedName
+    }));
+    if (replace) {
+      saveInvoices(sort(invs));
+      return {
+        added: invs.length,
+        skipped: 0
+      };
+    }
     var existing = new Set(invoices.map(function (i) {
       return i.number;
     }));
     var fresh = invs.filter(function (i) {
       return !existing.has(i.number);
     });
-    saveInvoices([].concat(_toConsumableArray(invoices), _toConsumableArray(fresh)).sort(function (a, b) {
-      var na = parseInt(a.number.replace(/\D/g, "")) || 0,
-        nb = parseInt(b.number.replace(/\D/g, "")) || 0;
-      return nb - na;
-    }));
-    if (detectedName && !settings.name) saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
-      name: detectedName
-    }));
-    return fresh.length;
+    saveInvoices(sort([].concat(_toConsumableArray(invoices), _toConsumableArray(fresh))));
+    return {
+      added: fresh.length,
+      skipped: invs.length - fresh.length
+    };
   };
   if (loading) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1471,6 +1485,7 @@ function InvoiceList(_ref7) {
     importMsg = _useState18[0],
     setImportMsg = _useState18[1];
   var fileRef = useRef();
+  var replaceRef = useRef();
 
   // Totals
   var totalAll = invoices.reduce(function (s, i) {
@@ -1508,6 +1523,7 @@ function InvoiceList(_ref7) {
     return b - a;
   });
   var handleFile = function handleFile(e) {
+    var replace = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
@@ -1516,15 +1532,23 @@ function InvoiceList(_ref7) {
         var _importXLSX = importXLSX(new Uint8Array(ev.target.result)),
           parsed = _importXLSX.invoices,
           detectedName = _importXLSX.detectedName;
-        var added = onImport(parsed, detectedName);
-        setImportMsg("\u2713 Imported ".concat(added, " invoice").concat(added !== 1 ? "s" : ""));
+        var _onImport = onImport(parsed, detectedName, replace),
+          added = _onImport.added,
+          skipped = _onImport.skipped;
+        if (replace) {
+          setImportMsg("\u2713 Replaced all \u2014 ".concat(added, " invoice").concat(added !== 1 ? "s" : "", " loaded"));
+        } else if (skipped > 0 && added === 0) {
+          setImportMsg("\u2139 All ".concat(skipped, " invoices already exist. Use \"Replace all\" to re-import."));
+        } else {
+          setImportMsg("\u2713 Imported ".concat(added, " invoice").concat(added !== 1 ? "s" : "").concat(skipped > 0 ? " (".concat(skipped, " already existed)") : ""));
+        }
       } catch (err) {
         setImportMsg("\u2717 ".concat(err.message));
       }
       e.target.value = "";
       setTimeout(function () {
         return setImportMsg("");
-      }, 4000);
+      }, 6000);
     };
     reader.readAsArrayBuffer(file);
   };
@@ -1632,7 +1656,7 @@ function InvoiceList(_ref7) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.1")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.2")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -1682,6 +1706,23 @@ function InvoiceList(_ref7) {
   }, "\u2191 Import XLSX"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       setMenuOpen(false);
+      replaceRef.current.click();
+    },
+    style: {
+      display: "block",
+      width: "100%",
+      padding: "12px 16px",
+      border: "none",
+      background: "none",
+      textAlign: "left",
+      cursor: "pointer",
+      fontSize: 14,
+      borderBottom: "1px solid ".concat(T.border),
+      color: "#C43636"
+    }
+  }, "\u21BA Replace all (re-import)"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      setMenuOpen(false);
       onExport();
     },
     style: {
@@ -1701,7 +1742,19 @@ function InvoiceList(_ref7) {
     style: {
       display: "none"
     },
-    onChange: handleFile
+    onChange: function onChange(e) {
+      return handleFile(e, false);
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: replaceRef,
+    type: "file",
+    accept: ".xlsx,.xls",
+    style: {
+      display: "none"
+    },
+    onChange: function onChange(e) {
+      return handleFile(e, true);
+    }
   }), importMsg && /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "8px 12px",
