@@ -813,7 +813,9 @@ var defaultSettings = {
   phone: "",
   currency: "$",
   currencyCode: "USD",
-  paymentInfo: ""
+  paymentInfo: "",
+  apiUrl: "",
+  resendFrom: ""
 };
 var mkInvoice = function mkInvoice(number) {
   return {
@@ -841,7 +843,13 @@ var mkInvoice = function mkInvoice(number) {
     paidDate: "",
     paymentMethod: "",
     notes: "",
-    paymentTerms: ""
+    paymentTerms: "",
+    emailStatus: "",
+    emailSentAt: "",
+    emailOpenedAt: "",
+    emailDeliveredAt: "",
+    emailRecipient: "",
+    emailMessageId: ""
   };
 };
 
@@ -1050,6 +1058,11 @@ var importXLSX = function importXLSX(data) {
   var iPd = col("amount paid", "paid amount", "paid");
   var iBal = col("balance due", "balance remaining", "balance");
   var iPay = col("payment details", "payment info", "payment");
+  var iEStatus = col("email status");
+  var iESentAt = col("email sent");
+  var iEOpenedAt = col("email opened");
+  var iERecipient = col("email recipient");
+  var iEMsgId = col("email message id", "email message");
   var invoices = [];
   for (var _i3 = hdrIdx + 1; _i3 < raw.length; _i3++) {
     var r = raw[_i3];
@@ -1102,7 +1115,13 @@ var importXLSX = function importXLSX(data) {
       paidDate: paidDate,
       paymentMethod: paymentMethod,
       notes: "",
-      paymentTerms: ""
+      paymentTerms: "",
+      emailStatus: String(get(r, iEStatus) || "").trim(),
+      emailSentAt: String(get(r, iESentAt) || "").trim(),
+      emailOpenedAt: String(get(r, iEOpenedAt) || "").trim(),
+      emailDeliveredAt: "",
+      emailRecipient: String(get(r, iERecipient) || "").trim(),
+      emailMessageId: String(get(r, iEMsgId) || "").trim()
     });
   }
   var debug = "hdr@".concat(hdrIdx, " cols:[").concat(hdrs.slice(0, 6).join('|'), "] rows:").concat(invoices.length);
@@ -1140,13 +1159,13 @@ var exportXLSX = function exportXLSX(invoices, settings, clients) {
   var clWs = XLSX.utils.aoa_to_sheet(clRows);
 
   // ── Invoices sheet ────────────────────────────────────────────
-  var invRows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", ""]];
+  var invRows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", "Email Status", "Email Sent", "Email Opened", "Email Recipient", "Email Message ID"]];
   invoices.forEach(function (inv) {
     var _inv$to;
     var _calc = calc(inv),
       total = _calc.total,
       balance = _calc.balance;
-    invRows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", ""]);
+    invRows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", inv.emailStatus || "", inv.emailSentAt || "", inv.emailOpenedAt || "", inv.emailRecipient || "", inv.emailMessageId || ""]);
   });
   var invWs = XLSX.utils.aoa_to_sheet(invRows);
 
@@ -1445,6 +1464,13 @@ var buildPDF = function buildPDF(inv, settings) {
     doc.text(_ls2, M, y);
   }
   return doc;
+};
+var buildEmailHTML = function buildEmailHTML(body, settings) {
+  var esc = function esc(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
+  var footer = [settings.name, settings.email, settings.phone].filter(Boolean).join(" \u00b7 ");
+  return "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;padding:24px;line-height:1.6;'><p style='white-space:pre-line;font-size:15px;'>" + esc(body) + "</p>" + (footer ? "<p style='margin-top:28px;color:#999;font-size:12px;border-top:1px solid #eee;padding-top:14px;'>" + esc(footer) + "</p>" : "") + "</body></html>";
 };
 /* ─── Styles ─────────────────────────────────────────────────────── */
 var T = {
@@ -2277,7 +2303,14 @@ function InvoiceList(_ref5) {
           fontSize: 12,
           color: over ? "#C43636" : inv.status === "paid" ? "#1A7A4A" : "#888"
         }
-      }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.paidDate || inv.dueDate || inv.date)).concat(inv.paymentMethod ? " · " + inv.paymentMethod : "") : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"));
+      }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.paidDate || inv.dueDate || inv.date)).concat(inv.paymentMethod ? " · " + inv.paymentMethod : "") : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"), inv.emailStatus ? /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 2,
+          fontSize: 11,
+          fontWeight: 600,
+          color: inv.emailStatus === "opened" ? "#15803D" : "#3654C4"
+        }
+      }, inv.emailStatus === "opened" ? "\uD83D\uDC41 Opened" : inv.emailStatus === "delivered" ? "\u2713 Delivered" : "\u2709 Email sent") : null));
     }));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: onNew,
@@ -2300,6 +2333,250 @@ function InvoiceList(_ref5) {
       zIndex: 30
     }
   }, "+"));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SEND EMAIL DIALOG
+═══════════════════════════════════════════════════════════════════ */
+function SendEmailDialog(_ref_sd) {
+  var inv = _ref_sd.inv,
+    settings = _ref_sd.settings,
+    pdfReady = _ref_sd.pdfReady,
+    onClose = _ref_sd.onClose,
+    onSent = _ref_sd.onSent;
+  var _totals = calc(inv);
+  var sym = settings.currency || "$";
+  var code = settings.currencyCode || "USD";
+  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + code + " " + sym + _totals.balance.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\nPlease do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
+  var _useState_sd1 = useState((inv.to && inv.to.email) || ""),
+    _useState_sd2 = _slicedToArray(_useState_sd1, 2),
+    to = _useState_sd2[0],
+    setTo = _useState_sd2[1];
+  var _useState_sd3 = useState("Invoice " + (inv.number || "") + " from " + (settings.name || "My Business")),
+    _useState_sd4 = _slicedToArray(_useState_sd3, 2),
+    subject = _useState_sd4[0],
+    setSubject = _useState_sd4[1];
+  var _useState_sd5 = useState(defaultBody),
+    _useState_sd6 = _slicedToArray(_useState_sd5, 2),
+    body = _useState_sd6[0],
+    setBody = _useState_sd6[1];
+  var _useState_sd7 = useState(false),
+    _useState_sd8 = _slicedToArray(_useState_sd7, 2),
+    sending = _useState_sd8[0],
+    setSending = _useState_sd8[1];
+  var _useState_sd9 = useState(""),
+    _useState_sd0 = _slicedToArray(_useState_sd9, 2),
+    msg = _useState_sd0[0],
+    setMsg = _useState_sd0[1];
+  var doSend = function doSend() {
+    if (!to.trim()) {
+      setMsg("Please enter a recipient email.");
+      return;
+    }
+    var apiUrl = (settings.apiUrl || "").replace(/\/$/, "");
+    if (!apiUrl) {
+      setMsg("Set your API URL in Settings \u2192 Email / API first.");
+      return;
+    }
+    if (!pdfReady) {
+      setMsg("PDF engine still loading \u2014 please try again in a moment.");
+      return;
+    }
+    setSending(true);
+    setMsg("");
+    var pdfBytes = buildPDF(inv, settings).output("uint8array");
+    var binary = "";
+    for (var _i = 0; _i < pdfBytes.length; _i++) binary += String.fromCharCode(pdfBytes[_i]);
+    var pdfBase64 = btoa(binary);
+    var htmlBody = buildEmailHTML(body, settings);
+    fetch(apiUrl + "/api/send-invoice", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        to: to.trim(),
+        subject: subject,
+        html: htmlBody,
+        invoiceId: inv.id,
+        invoiceNumber: inv.number,
+        pdfBase64: pdfBase64,
+        pdfFilename: (inv.number || "invoice") + ".pdf",
+        fromName: settings.name || ""
+      })
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.error || "Send failed (" + r.status + ")");
+        return d;
+      });
+    }).then(function (data) {
+      onSent({
+        emailStatus: "sent",
+        emailSentAt: new Date().toISOString(),
+        emailRecipient: to.trim(),
+        emailMessageId: data.id || ""
+      });
+      onClose();
+    }).catch(function (err) {
+      setMsg("Error: " + err.message);
+      setSending(false);
+    });
+  };
+  var lblSd = {
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    color: "#888",
+    display: "block",
+    marginBottom: 4
+  };
+  var inpSd = {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1.5px solid #DDD",
+    borderRadius: 8,
+    padding: "10px 12px",
+    fontSize: 15,
+    fontFamily: "inherit",
+    outline: "none"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,.55)",
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: "18px 18px 0 0",
+      padding: "20px 16px 40px",
+      width: "100%",
+      boxSizing: "border-box",
+      maxHeight: "92vh",
+      overflowY: "auto"
+    },
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 17,
+      color: T.textDark
+    }
+  }, "\u2709 Send Invoice " + (inv.number || "")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 24,
+      cursor: "pointer",
+      color: "#aaa",
+      lineHeight: 1,
+      padding: "0 4px"
+    }
+  }, "\u00d7")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lblSd
+  }, "To"), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    style: inpSd,
+    value: to,
+    onChange: function onChange(e) {
+      return setTo(e.target.value);
+    },
+    placeholder: "client@example.com",
+    autoFocus: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lblSd
+  }, "Subject"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    style: inpSd,
+    value: subject,
+    onChange: function onChange(e) {
+      return setSubject(e.target.value);
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lblSd
+  }, "Message"), /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      width: "100%",
+      boxSizing: "border-box",
+      border: "1.5px solid #DDD",
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontSize: 14,
+      fontFamily: "inherit",
+      resize: "vertical",
+      minHeight: 130,
+      lineHeight: 1.6,
+      outline: "none"
+    },
+    value: body,
+    onChange: function onChange(e) {
+      return setBody(e.target.value);
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#888",
+      marginBottom: 14
+    }
+  }, "Invoice PDF will be attached automatically."), msg ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 12px",
+      background: "#FEF2F2",
+      color: "#B91C1C",
+      borderRadius: 8,
+      marginBottom: 12,
+      fontSize: 13
+    }
+  }, msg) : null, /*#__PURE__*/React.createElement("button", {
+    onClick: doSend,
+    disabled: sending,
+    style: {
+      width: "100%",
+      padding: 14,
+      background: sending ? "#A0AEC0" : "#15803D",
+      color: "#fff",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: sending ? "default" : "pointer"
+    }
+  }, sending ? "Sending\u2026" : "\u2709 Send Invoice"), inv.emailSentAt ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      textAlign: "center",
+      fontSize: 12,
+      color: "#888"
+    }
+  }, "Last sent " + fmtDate((inv.emailSentAt || "").slice(0, 10)) + (inv.emailRecipient ? " to " + inv.emailRecipient : "")) : null));
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2337,6 +2614,10 @@ function InvoiceForm(_ref7) {
     _useState30 = _slicedToArray(_useState29, 2),
     clientOpen = _useState30[0],
     setClientOpen = _useState30[1];
+  var _useState31 = useState(false),
+    _useState32 = _slicedToArray(_useState31, 2),
+    sendOpen = _useState32[0],
+    setSendOpen = _useState32[1];
   var totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
@@ -2381,6 +2662,11 @@ function InvoiceForm(_ref7) {
         })
       });
     });
+  };
+  var onEmailSent = function onEmailSent(emailFields) {
+    var updated = _objectSpread(_objectSpread({}, inv), emailFields);
+    setInv(updated);
+    onSave(updated);
   };
   var doShare = /*#__PURE__*/function () {
     var _ref8 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
@@ -3004,7 +3290,54 @@ function InvoiceForm(_ref7) {
       return set("paymentTerms", e.target.value);
     },
     placeholder: "Payment due within 30 days."
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))), inv.emailStatus ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "0 12px 8px",
+      padding: "10px 14px",
+      background: "#F0F4FF",
+      borderRadius: 10,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#3654C4"
+    }
+  }, inv.emailStatus === "opened" ? "\uD83D\uDC41 Opened" : inv.emailStatus === "delivered" ? "\u2713 Delivered" : "\u2709 Sent"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#666",
+      marginTop: 2
+    }
+  }, (inv.emailRecipient ? inv.emailRecipient + " \u00b7 " : "") + fmtDate((inv.emailSentAt || "").slice(0, 10)))), inv.emailMessageId && settings.apiUrl ? /*#__PURE__*/React.createElement("button", {
+    style: {
+      fontSize: 12,
+      color: "#3654C4",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: "4px 8px"
+    },
+    onClick: function onClick() {
+      var apiUrl = (settings.apiUrl || "").replace(/\/$/, "");
+      fetch(apiUrl + "/api/check-status?id=" + encodeURIComponent(inv.emailMessageId)).then(function (r) {
+        return r.json();
+      }).then(function (d) {
+        if (d.status) {
+          var updated = _objectSpread(_objectSpread({}, inv), {}, {
+            emailStatus: d.status,
+            emailOpenedAt: d.openedAt || inv.emailOpenedAt || "",
+            emailDeliveredAt: d.deliveredAt || inv.emailDeliveredAt || ""
+          });
+          setInv(updated);
+          onSave(updated);
+        }
+      }).catch(function () {});
+    }
+  }, "\u21bb Refresh") : null) : null, /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "0 12px",
       display: "flex",
@@ -3014,7 +3347,7 @@ function InvoiceForm(_ref7) {
     onClick: doShare,
     disabled: sharing,
     style: {
-      flex: 2,
+      flex: 1,
       padding: "13px",
       background: T.blue,
       color: "#fff",
@@ -3025,7 +3358,22 @@ function InvoiceForm(_ref7) {
       cursor: "pointer",
       opacity: sharing ? .7 : 1
     }
-  }, sharing ? "Preparing…" : "✉ Send / Share"), /*#__PURE__*/React.createElement("button", {
+  }, sharing ? "Preparing\u2026" : "\u2197 Share"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return setSendOpen(true);
+    },
+    style: {
+      flex: 1,
+      padding: "13px",
+      background: "#15803D",
+      color: "#fff",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "\u2709 Email"), /*#__PURE__*/React.createElement("button", {
     onClick: doDownload,
     style: {
       flex: 1,
@@ -3319,7 +3667,15 @@ function InvoiceForm(_ref7) {
       cursor: "pointer",
       fontSize: 13
     }
-  }, "Save last item to catalog")))));
+  }, "Save last item to catalog")))), sendOpen && /*#__PURE__*/React.createElement(SendEmailDialog, {
+    inv: inv,
+    settings: settings,
+    pdfReady: pdfReady,
+    onClose: function onClose() {
+      return setSendOpen(false);
+    },
+    onSent: onEmailSent
+  }));
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3601,6 +3957,55 @@ function SettingsScreen(_ref1) {
     },
     placeholder: "Bank: \u2026  IBAN: \u2026  Wise: \u2026"
   }))), /*#__PURE__*/React.createElement("div", {
+    style: cardStyle()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: T.blue,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 12
+    }
+  }, "Email / API"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "API URL"), /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "url",
+    value: s.apiUrl || "",
+    onChange: function onChange(e) {
+      return set("apiUrl", e.target.value);
+    },
+    placeholder: "https://your-app.vercel.app"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#aaa",
+      marginTop: 4
+    }
+  }, "Your deployed Vercel URL (for email sending)")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "From Email (Resend sender)"), /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "email",
+    value: s.resendFrom || "",
+    onChange: function onChange(e) {
+      return set("resendFrom", e.target.value);
+    },
+    placeholder: "onboarding@resend.dev"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#aaa",
+      marginTop: 4
+    }
+  }, "Verified Resend sender address (leave blank to use onboarding@resend.dev for testing)")))), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "12px 24px",
