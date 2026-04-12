@@ -806,10 +806,10 @@ var calc = function calc(inv) {
 };
 var defaultSettings = {
   name: "",
-  bnLabel: "Business No.",
+  bnLabel: "IČO",
   bn: "",
   address: "",
-  email: "",
+  email: "beatriz.ccampo@gmail.com",
   phone: "",
   currency: "$",
   currencyCode: "USD",
@@ -844,82 +844,144 @@ var mkInvoice = function mkInvoice(number) {
 };
 
 /* ─── Import / Export ────────────────────────────────────────────── */
+var toISO = function toISO(v) {
+  if (!v) return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "number") {
+    var d = new Date(Math.round((v - 25569) * 86400000));
+    return d.toISOString().slice(0, 10);
+  }
+  if (typeof v === "string" && v.match(/\d{4}/)) return v.slice(0, 10);
+  return "";
+};
 var importXLSX = function importXLSX(data) {
   var wb = XLSX.read(data, {
-    type: "array"
+    type: "array",
+    cellDates: true
   });
   var ws = wb.Sheets[wb.SheetNames[0]];
-  var rows = XLSX.utils.sheet_to_json(ws, {
-    header: 1
+  var raw = XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    defval: ""
   });
-  var detectedName = "";
-  rows.slice(0, 5).forEach(function (r) {
-    if (typeof r[0] === "string" && r[0].length > 2 && r[0].length < 60 && !r[0].includes("Invoice")) detectedName = r[0];
-  });
-  var headerIdx = rows.findIndex(function (r) {
-    return r.some(function (c) {
-      return typeof c === "string" && c.toLowerCase().includes("invoice");
+
+  // Find header row: must have invoice-like + date-like + amount-like columns
+  var hdrIdx = -1;
+  for (var i = 0; i < Math.min(raw.length, 10); i++) {
+    var row = raw[i].map(function (c) {
+      return String(c).toLowerCase();
     });
-  });
-  if (headerIdx < 0) throw new Error("Could not find header row");
-  var hdr = rows[headerIdx].map(function (c) {
-    return (c || "").toString().toLowerCase().trim();
-  });
-  var col = function col(names) {
-    var _names$map$find;
-    return (_names$map$find = names.map(function (n) {
-      return hdr.findIndex(function (h) {
-        return h.includes(n);
-      });
-    }).find(function (i) {
-      return i >= 0;
-    })) !== null && _names$map$find !== void 0 ? _names$map$find : -1;
-  };
-  var iNum = col(["invoice #", "invoice no", "number"]);
-  var iDate = col(["invoice date", "date"]);
-  var iDue = col(["due date"]);
-  var iClient = col(["client", "customer", "bill to"]);
-  var iTotal = col(["total", "amount"]);
-  var iStatus = col(["status", "paid"]);
-  var invoices = [];
-  for (var i = headerIdx + 1; i < rows.length; i++) {
-    var _ref, _r$iNum, _r$iClient, _r$iClient2;
-    var r = rows[i];
-    if (!r[iNum]) continue;
-    var excelDateToStr = function excelDateToStr(v) {
-      if (typeof v === "number") {
-        var d = new Date(Math.round((v - 25569) * 86400000));
-        return d.toISOString().slice(0, 10);
+    var hasInv = row.some(function (c) {
+      return c.includes("invoice") || c === "#" || c.includes("number");
+    });
+    var hasDate = row.some(function (c) {
+      return c.includes("date");
+    });
+    var hasAmt = row.some(function (c) {
+      return c.includes("total") || c.includes("amount") || c.includes("balance");
+    });
+    if (hasInv && hasDate && hasAmt) {
+      hdrIdx = i;
+      break;
+    }
+  }
+  // Fallback: row with most non-empty cells in first 8 rows
+  if (hdrIdx < 0) {
+    var best = 0;
+    for (var _i = 0; _i < Math.min(raw.length, 8); _i++) {
+      var n = raw[_i].filter(function (c) {
+        return c !== "";
+      }).length;
+      if (n > best) {
+        best = n;
+        hdrIdx = _i;
       }
-      if (typeof v === "string" && v.match(/\d{4}/)) return v.slice(0, 10);
-      return "";
-    };
-    var rawStatus = ((_ref = iStatus >= 0 ? r[iStatus] : "") === null || _ref === void 0 ? void 0 : _ref.toString().toLowerCase()) || "";
-    var status = rawStatus.includes("paid") ? "paid" : rawStatus.includes("sent") ? "sent" : "draft";
-    var total = parseFloat(r[iTotal]) || 0;
+    }
+  }
+  if (hdrIdx < 0) throw new Error("Could not find invoice data in this file");
+
+  // Detect business name from rows before header
+  var detectedName = "";
+  for (var _i2 = 0; _i2 < hdrIdx; _i2++) {
+    var cell = String(raw[_i2][0] || "").trim();
+    if (cell && !/summary|invoice|date|from|to/i.test(cell)) {
+      detectedName = cell.includes(" - ") ? cell.split(" - ").slice(-1)[0].trim() : cell;
+      break;
+    }
+  }
+  var hdrs = raw[hdrIdx].map(function (h) {
+    return String(h).toLowerCase().trim();
+  });
+  // Flexible column finder — tries multiple names, returns -1 only if none match
+  var col = function col() {
+    for (var _len = arguments.length, names = new Array(_len), _key = 0; _key < _len; _key++) {
+      names[_key] = arguments[_key];
+    }
+    var _loop = function _loop() {
+        var n = _names[_i3];
+        var idx = hdrs.findIndex(function (h) {
+          return h.includes(n);
+        });
+        if (idx >= 0) return {
+          v: idx
+        };
+      },
+      _ret;
+    for (var _i3 = 0, _names = names; _i3 < _names.length; _i3++) {
+      _ret = _loop();
+      if (_ret) return _ret.v;
+    }
+    return -1;
+  };
+  var get = function get(r, idx) {
+    return idx >= 0 ? r[idx] : "";
+  };
+  var iN = col("invoice #", "invoice no", "#", "invoice", "number");
+  var iD = col("invoice date", "date");
+  var iDu = col("due date", "due");
+  var iCl = col("client name", "client", "customer", "bill to", "name");
+  var iEm = col("client email", "email");
+  var iTot = col("invoice total", "amount due", "total", "amount");
+  var iPd = col("amount paid", "paid amount", "paid");
+  var iBal = col("balance due", "balance remaining", "balance");
+  var iPay = col("payment details", "payment info", "payment");
+  var invoices = [];
+  for (var _i4 = hdrIdx + 1; _i4 < raw.length; _i4++) {
+    var r = raw[_i4];
+    if (r.filter(function (c) {
+      return c !== "";
+    }).length < 2) continue; // skip empty rows
+    var num = String(get(r, iN) || "").trim();
+    if (!num) continue; // skip rows without an invoice number
+
+    var total = parseFloat(get(r, iTot)) || 0;
+    var paid = parseFloat(get(r, iPd)) || 0;
+    var balRaw = parseFloat(get(r, iBal));
+    var balance = isNaN(balRaw) ? total - paid : balRaw;
+    var status = balance <= 0.01 ? "paid" : "sent";
     invoices.push({
       id: uid(),
-      number: ((_r$iNum = r[iNum]) === null || _r$iNum === void 0 ? void 0 : _r$iNum.toString()) || "",
-      date: excelDateToStr(r[iDate]) || todayStr(),
-      dueDate: excelDateToStr(r[iDue]) || "",
+      number: num,
+      date: toISO(get(r, iD)) || todayStr(),
+      dueDate: toISO(get(r, iDu)) || "",
       status: status,
       to: {
-        name: ((_r$iClient = r[iClient]) === null || _r$iClient === void 0 ? void 0 : _r$iClient.toString()) || "",
-        email: "",
+        name: String(get(r, iCl) || "").trim(),
+        email: String(get(r, iEm) || "").trim(),
         address: ""
       },
       items: [{
         id: uid(),
-        desc: ((_r$iClient2 = r[iClient]) === null || _r$iClient2 === void 0 ? void 0 : _r$iClient2.toString()) || "Services",
+        desc: "Services",
         detail: "",
         qty: 1,
         rate: total,
         unit: ""
       }],
-      discount: 0,
       tax: 0,
-      payments: 0,
-      notes: "",
+      discount: 0,
+      payments: paid,
+      notes: String(get(r, iPay) || "").trim(),
       paymentTerms: ""
     });
   }
@@ -998,10 +1060,10 @@ var buildPDF = function buildPDF(inv, settings) {
     align: "right"
   });
   rY += 7;
-  [[inv.number, "#"], ["Date", fmtDate(inv.date)], ["Due", fmtDate(inv.dueDate) || "—"]].forEach(function (_ref2) {
-    var _ref3 = _slicedToArray(_ref2, 2),
-      label = _ref3[0],
-      val = _ref3[1];
+  [[inv.number, "#"], ["Date", fmtDate(inv.date)], ["Due", fmtDate(inv.dueDate) || "—"]].forEach(function (_ref) {
+    var _ref2 = _slicedToArray(_ref, 2),
+      label = _ref2[0],
+      val = _ref2[1];
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(130, 130, 130);
@@ -1166,19 +1228,19 @@ var cardStyle = function cardStyle() {
     padding: "16px"
   }, x);
 };
-var Field = function Field(_ref4) {
-  var label = _ref4.label,
-    children = _ref4.children,
-    _ref4$style = _ref4.style,
-    style = _ref4$style === void 0 ? {} : _ref4$style;
+var Field = function Field(_ref3) {
+  var label = _ref3.label,
+    children = _ref3.children,
+    _ref3$style = _ref3.style,
+    style = _ref3$style === void 0 ? {} : _ref3$style;
   return /*#__PURE__*/React.createElement("div", {
     style: style
   }, /*#__PURE__*/React.createElement("label", {
     style: lbl
   }, label), children);
 };
-var Badge = function Badge(_ref5) {
-  var inv = _ref5.inv;
+var Badge = function Badge(_ref4) {
+  var inv = _ref4.inv;
   var over = isOverdue(inv);
   if (over) return /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1257,11 +1319,11 @@ function App() {
     loading = _useState14[0],
     setLoading = _useState14[1];
   useEffect(function () {
-    Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog")]).then(function (_ref6) {
-      var _ref7 = _slicedToArray(_ref6, 3),
-        invs = _ref7[0],
-        sett = _ref7[1],
-        cat = _ref7[2];
+    Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog")]).then(function (_ref5) {
+      var _ref6 = _slicedToArray(_ref5, 3),
+        invs = _ref6[0],
+        sett = _ref6[1],
+        cat = _ref6[2];
       if (invs) setInvoices(invs);
       if (sett) setSettings(_objectSpread(_objectSpread({}, defaultSettings), sett));
       if (cat) setCatalog(cat);
@@ -1390,16 +1452,16 @@ function App() {
 /* ═══════════════════════════════════════════════════════════════════
    INVOICE LIST
 ═══════════════════════════════════════════════════════════════════ */
-function InvoiceList(_ref8) {
-  var invoices = _ref8.invoices,
-    filter = _ref8.filter,
-    onFilter = _ref8.onFilter,
-    onNew = _ref8.onNew,
-    onOpen = _ref8.onOpen,
-    onSettings = _ref8.onSettings,
-    onCatalog = _ref8.onCatalog,
-    onImport = _ref8.onImport,
-    onExport = _ref8.onExport;
+function InvoiceList(_ref7) {
+  var invoices = _ref7.invoices,
+    filter = _ref7.filter,
+    onFilter = _ref7.onFilter,
+    onNew = _ref7.onNew,
+    onOpen = _ref7.onOpen,
+    onSettings = _ref7.onSettings,
+    onCatalog = _ref7.onCatalog,
+    onImport = _ref7.onImport,
+    onExport = _ref7.onExport;
   var _useState15 = useState(false),
     _useState16 = _slicedToArray(_useState15, 2),
     menuOpen = _useState16[0],
@@ -1466,13 +1528,13 @@ function InvoiceList(_ref8) {
     };
     reader.readAsArrayBuffer(file);
   };
-  var SummaryCard = function SummaryCard(_ref9) {
-    var label = _ref9.label,
-      amount = _ref9.amount,
-      filterKey = _ref9.filterKey,
-      bg = _ref9.bg,
-      color = _ref9.color,
-      activeBorder = _ref9.activeBorder;
+  var SummaryCard = function SummaryCard(_ref8) {
+    var label = _ref8.label,
+      amount = _ref8.amount,
+      filterKey = _ref8.filterKey,
+      bg = _ref8.bg,
+      color = _ref8.color,
+      activeBorder = _ref8.activeBorder;
     var active = filter === filterKey;
     return /*#__PURE__*/React.createElement("div", {
       onClick: function onClick() {
@@ -1827,16 +1889,16 @@ function InvoiceList(_ref8) {
 /* ═══════════════════════════════════════════════════════════════════
    INVOICE FORM
 ═══════════════════════════════════════════════════════════════════ */
-function InvoiceForm(_ref0) {
+function InvoiceForm(_ref9) {
   var _inv$to3, _inv$to4, _inv$to5;
-  var invoice = _ref0.invoice,
-    settings = _ref0.settings,
-    catalog = _ref0.catalog,
-    onSaveCatalog = _ref0.onSaveCatalog,
-    pdfReady = _ref0.pdfReady,
-    onSave = _ref0.onSave,
-    onDelete = _ref0.onDelete,
-    onBack = _ref0.onBack;
+  var invoice = _ref9.invoice,
+    settings = _ref9.settings,
+    catalog = _ref9.catalog,
+    onSaveCatalog = _ref9.onSaveCatalog,
+    pdfReady = _ref9.pdfReady,
+    onSave = _ref9.onSave,
+    onDelete = _ref9.onDelete,
+    onBack = _ref9.onBack;
   var _useState19 = useState(invoice),
     _useState20 = _slicedToArray(_useState19, 2),
     inv = _useState20[0],
@@ -1899,7 +1961,7 @@ function InvoiceForm(_ref0) {
     });
   };
   var doShare = /*#__PURE__*/function () {
-    var _ref1 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
+    var _ref0 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
       var doc, blob, file, url, a, _t;
       return _regenerator().w(function (_context) {
         while (1) switch (_context.p = _context.n) {
@@ -1956,7 +2018,7 @@ function InvoiceForm(_ref0) {
       }, _callee, null, [[2, 6]]);
     }));
     return function doShare() {
-      return _ref1.apply(this, arguments);
+      return _ref0.apply(this, arguments);
     };
   }();
   var doDownload = function doDownload() {
@@ -2370,11 +2432,11 @@ function InvoiceForm(_ref0) {
       return set("payments", e.target.value);
     },
     placeholder: "0"
-  })))), [["Subtotal", totals.sub], totals.disc > 0 ? ["Discount", -totals.disc] : null, parseFloat(inv.tax) > 0 ? ["Tax (".concat(inv.tax, "%)"), totals.taxAmt] : null, ["Total", totals.total, true], parseFloat(inv.payments) > 0 ? ["Payments", -inv.payments] : null].filter(Boolean).map(function (_ref10) {
-    var _ref11 = _slicedToArray(_ref10, 3),
-      l = _ref11[0],
-      v = _ref11[1],
-      bold = _ref11[2];
+  })))), [["Subtotal", totals.sub], totals.disc > 0 ? ["Discount", -totals.disc] : null, parseFloat(inv.tax) > 0 ? ["Tax (".concat(inv.tax, "%)"), totals.taxAmt] : null, ["Total", totals.total, true], parseFloat(inv.payments) > 0 ? ["Payments", -inv.payments] : null].filter(Boolean).map(function (_ref1) {
+    var _ref10 = _slicedToArray(_ref1, 3),
+      l = _ref10[0],
+      v = _ref10[1],
+      bold = _ref10[2];
     return /*#__PURE__*/React.createElement("div", {
       key: l,
       style: {
@@ -2651,10 +2713,10 @@ function InvoiceForm(_ref0) {
 /* ═══════════════════════════════════════════════════════════════════
    SETTINGS SCREEN
 ═══════════════════════════════════════════════════════════════════ */
-function SettingsScreen(_ref12) {
-  var settings = _ref12.settings,
-    onSave = _ref12.onSave,
-    onBack = _ref12.onBack;
+function SettingsScreen(_ref11) {
+  var settings = _ref11.settings,
+    onSave = _ref11.onSave,
+    onBack = _ref11.onBack;
   var _useState27 = useState(settings),
     _useState28 = _slicedToArray(_useState27, 2),
     s = _useState28[0],
@@ -2737,12 +2799,12 @@ function SettingsScreen(_ref12) {
       flexDirection: "column",
       gap: 10
     }
-  }, [["name", "Business Name", "text", "Bea Freelance"], ["email", "Email", "email", "you@email.com"], ["phone", "Phone", "tel", "+420 …"]].map(function (_ref13) {
-    var _ref14 = _slicedToArray(_ref13, 4),
-      k = _ref14[0],
-      label = _ref14[1],
-      type = _ref14[2],
-      ph = _ref14[3];
+  }, [["name", "Business Name", "text", "Bea Freelance"], ["email", "Email", "email", "you@email.com"], ["phone", "Phone", "tel", "+420 …"]].map(function (_ref12) {
+    var _ref13 = _slicedToArray(_ref12, 4),
+      k = _ref13[0],
+      label = _ref13[1],
+      type = _ref13[2],
+      ph = _ref13[3];
     return /*#__PURE__*/React.createElement("div", {
       key: k
     }, /*#__PURE__*/React.createElement("label", {
@@ -2866,10 +2928,10 @@ function SettingsScreen(_ref12) {
 /* ═══════════════════════════════════════════════════════════════════
    CATALOG SCREEN
 ═══════════════════════════════════════════════════════════════════ */
-function CatalogScreen(_ref15) {
-  var catalog = _ref15.catalog,
-    onSave = _ref15.onSave,
-    onBack = _ref15.onBack;
+function CatalogScreen(_ref14) {
+  var catalog = _ref14.catalog,
+    onSave = _ref14.onSave,
+    onBack = _ref14.onBack;
   var _useState29 = useState(catalog),
     _useState30 = _slicedToArray(_useState29, 2),
     items = _useState30[0],
