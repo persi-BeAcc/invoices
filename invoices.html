@@ -838,6 +838,8 @@ var mkInvoice = function mkInvoice(number) {
     discount: 0,
     tax: 0,
     payments: 0,
+    paidDate: "",
+    paymentMethod: "",
     notes: "",
     paymentTerms: ""
   };
@@ -966,6 +968,19 @@ var importXLSX = function importXLSX(data) {
     var balRaw = parseFloat(get(r, iBal));
     var balance = isNaN(balRaw) ? total - paid : balRaw;
     var status = balance <= 0.01 ? "paid" : "sent";
+
+    // Parse "amount; date; method" from payment details cell
+    var payStr = String(get(r, iPay) || "").trim();
+    var paidDate = "",
+      paymentMethod = "";
+    if (payStr) {
+      var parts = payStr.split(";").map(function (p) {
+        return p.trim();
+      });
+      // parts[0] = amount (already in `paid`), parts[1] = date, parts[2] = method
+      if (parts[1]) paidDate = toISO(parts[1]) || parts[1];
+      if (parts[2]) paymentMethod = parts[2];
+    }
     invoices.push({
       id: uid(),
       number: num,
@@ -988,7 +1003,9 @@ var importXLSX = function importXLSX(data) {
       tax: 0,
       discount: 0,
       payments: paid,
-      notes: String(get(r, iPay) || "").trim(),
+      paidDate: paidDate,
+      paymentMethod: paymentMethod,
+      notes: "",
       paymentTerms: ""
     });
   }
@@ -1277,7 +1294,10 @@ var buildPDF = function buildPDF(inv, settings) {
   doc.line(tLabelX - 36, ty - 1, tValX, ty - 1);
   ty += 2;
   tRow("TOTAL", "".concat(sym).concat(total.toFixed(2)), true);
-  if (parseFloat(inv.payments) > 0) tRow("PAYMENTS RECEIVED", "-".concat(sym).concat(parseFloat(inv.payments).toFixed(2)));
+  if (parseFloat(inv.payments) > 0) {
+    var pdLabel = inv.paidDate ? "PAID ".concat(fmtDate(inv.paidDate)).concat(inv.paymentMethod ? " · " + inv.paymentMethod : "") : "PAYMENTS RECEIVED";
+    tRow(pdLabel, "-".concat(sym).concat(parseFloat(inv.payments).toFixed(2)));
+  }
   doc.line(tLabelX - 36, ty - 1, tValX, ty - 1);
   ty += 3;
   f("bold", 8);
@@ -1790,7 +1810,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.7")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.8")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2057,7 +2077,7 @@ function InvoiceList(_ref5) {
           fontSize: 12,
           color: over ? "#C43636" : inv.status === "paid" ? "#1A7A4A" : "#888"
         }
-      }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.dueDate || inv.date)) : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"));
+      }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.paidDate || inv.dueDate || inv.date)).concat(inv.paymentMethod ? " · " + inv.paymentMethod : "") : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"));
     }));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: onNew,
@@ -2305,14 +2325,18 @@ function InvoiceForm(_ref7) {
     style: {
       display: "flex",
       gap: 8,
-      marginBottom: 12,
+      marginBottom: inv.status === "paid" ? 8 : 12,
       flexWrap: "wrap"
     }
-  }, ["draft", "sent", "paid"].map(function (s) {
+  }, ["draft", "sent", "paid"].map(function (st) {
     return /*#__PURE__*/React.createElement("button", {
-      key: s,
+      key: st,
       onClick: function onClick() {
-        return set("status", s);
+        set("status", st);
+        if (st === "paid") {
+          if (!parseFloat(inv.payments)) set("payments", totals.balance);
+          if (!inv.paidDate) set("paidDate", todayStr());
+        }
       },
       style: {
         padding: "6px 14px",
@@ -2321,11 +2345,69 @@ function InvoiceForm(_ref7) {
         fontWeight: 700,
         border: "none",
         cursor: "pointer",
-        background: inv.status === s ? statusColors[s].bg : "#F0EDE8",
-        color: inv.status === s ? statusColors[s].c : "#888"
+        background: inv.status === st ? statusColors[st].bg : "#F0EDE8",
+        color: inv.status === st ? statusColors[st].c : "#888"
       }
-    }, s.charAt(0).toUpperCase() + s.slice(1));
-  })), /*#__PURE__*/React.createElement("div", {
+    }, st.charAt(0).toUpperCase() + st.slice(1));
+  })), inv.status === "paid" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#E6F4ED",
+      borderRadius: 10,
+      padding: "12px",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#1A7A4A",
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "Payment Received"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Amount",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "number",
+    value: inv.payments || "",
+    onChange: function onChange(e) {
+      return set("payments", e.target.value);
+    },
+    placeholder: "0"
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Date",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "date",
+    value: inv.paidDate || "",
+    onChange: function onChange(e) {
+      return set("paidDate", e.target.value);
+    }
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Method",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    value: inv.paymentMethod || "",
+    onChange: function onChange(e) {
+      return set("paymentMethod", e.target.value);
+    },
+    placeholder: "BANK, WISE\u2026"
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -2613,19 +2695,6 @@ function InvoiceForm(_ref7) {
     value: inv.tax || 0,
     onChange: function onChange(e) {
       return set("tax", e.target.value);
-    },
-    placeholder: "0"
-  })), /*#__PURE__*/React.createElement(Field, {
-    label: "Payments Received",
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    style: inp(),
-    type: "number",
-    value: inv.payments || 0,
-    onChange: function onChange(e) {
-      return set("payments", e.target.value);
     },
     placeholder: "0"
   })))), [["Subtotal", totals.sub], totals.disc > 0 ? ["Discount", -totals.disc] : null, parseFloat(inv.tax) > 0 ? ["Tax (".concat(inv.tax, "%)"), totals.taxAmt] : null, ["Total", totals.total, true], parseFloat(inv.payments) > 0 ? ["Payments", -inv.payments] : null].filter(Boolean).map(function (_ref9) {
