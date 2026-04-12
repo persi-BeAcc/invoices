@@ -851,10 +851,17 @@ var toISO = function toISO(v) {
     var d = new Date(Math.round((v - 25569) * 86400000));
     return d.toISOString().slice(0, 10);
   }
-  if (typeof v === "string" && v.match(/\d{4}/)) return v.slice(0, 10);
+  if (typeof v === "string") {
+    // Handle "Apr 11, 2026" format from Invoice Simple
+    var parsed = new Date(v);
+    if (!isNaN(parsed)) return parsed.toISOString().slice(0, 10);
+    // Handle "2026-04-11" format
+    if (v.match(/^\d{4}-\d{2}-\d{2}/)) return v.slice(0, 10);
+  }
   return "";
 };
 var importXLSX = function importXLSX(data) {
+  var _raw$;
   var wb = XLSX.read(data, {
     type: "array",
     cellDates: true
@@ -900,14 +907,11 @@ var importXLSX = function importXLSX(data) {
   }
   if (hdrIdx < 0) throw new Error("Could not find invoice data in this file");
 
-  // Detect business name from rows before header
+  // Detect business name - row 0 is "Invoice Summary - Business Name"
   var detectedName = "";
-  for (var _i2 = 0; _i2 < hdrIdx; _i2++) {
-    var cell = String(raw[_i2][0] || "").trim();
-    if (cell && !/summary|invoice|date|from|to/i.test(cell)) {
-      detectedName = cell.includes(" - ") ? cell.split(" - ").slice(-1)[0].trim() : cell;
-      break;
-    }
+  var titleCell = String(((_raw$ = raw[0]) === null || _raw$ === void 0 ? void 0 : _raw$[0]) || "").trim();
+  if (titleCell.includes(" - ")) {
+    detectedName = titleCell.split(" - ").slice(1).join(" - ").trim();
   }
   var hdrs = raw[hdrIdx].map(function (h) {
     return String(h).toLowerCase().trim();
@@ -918,7 +922,7 @@ var importXLSX = function importXLSX(data) {
       names[_key] = arguments[_key];
     }
     var _loop = function _loop() {
-        var n = _names[_i3];
+        var n = _names[_i2];
         var idx = hdrs.findIndex(function (h) {
           return h.includes(n);
         });
@@ -927,7 +931,7 @@ var importXLSX = function importXLSX(data) {
         };
       },
       _ret;
-    for (var _i3 = 0, _names = names; _i3 < _names.length; _i3++) {
+    for (var _i2 = 0, _names = names; _i2 < _names.length; _i2++) {
       _ret = _loop();
       if (_ret) return _ret.v;
     }
@@ -936,18 +940,21 @@ var importXLSX = function importXLSX(data) {
   var get = function get(r, idx) {
     return idx >= 0 ? r[idx] : "";
   };
-  var iN = col("invoice #", "invoice no", "#", "invoice", "number");
+  var iN = col("invoice", "invoice #", "invoice no", "number");
   var iD = col("invoice date", "date");
   var iDu = col("due date", "due");
   var iCl = col("client name", "client", "customer", "bill to", "name");
   var iEm = col("client email", "email");
-  var iTot = col("invoice total", "amount due", "total", "amount");
+  var iTot = function () {
+    var exact = hdrs.indexOf("total");
+    return exact >= 0 ? exact : col("invoice total", "amount due", "subtotal", "amount");
+  }();
   var iPd = col("amount paid", "paid amount", "paid");
   var iBal = col("balance due", "balance remaining", "balance");
   var iPay = col("payment details", "payment info", "payment");
   var invoices = [];
-  for (var _i4 = hdrIdx + 1; _i4 < raw.length; _i4++) {
-    var r = raw[_i4];
+  for (var _i3 = hdrIdx + 1; _i3 < raw.length; _i3++) {
+    var r = raw[_i3];
     if (r.filter(function (c) {
       return c !== "";
     }).length < 2) continue; // skip empty rows
@@ -1679,7 +1686,7 @@ function InvoiceList(_ref7) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.4")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.5")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
