@@ -1486,6 +1486,8 @@ var inp = function inp() {
   var x = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return _objectSpread({
     width: "100%",
+    boxSizing: "border-box",
+    minWidth: 0,
     padding: "9px 11px",
     fontSize: 14,
     border: "1.5px solid ".concat(T.border),
@@ -1518,7 +1520,7 @@ var Field = function Field(_ref) {
     _ref$style = _ref.style,
     style = _ref$style === void 0 ? {} : _ref$style;
   return /*#__PURE__*/React.createElement("div", {
-    style: style
+    style: _objectSpread({minWidth: 0, overflow: "hidden"}, style)
   }, /*#__PURE__*/React.createElement("label", {
     style: lbl
   }, label), children);
@@ -2036,7 +2038,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.13")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.14")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -3386,7 +3388,7 @@ function InvoiceForm(_ref7) {
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "\u2193 PDF")), !showDel ? /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDC41 PDF")), !showDel ? /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       marginTop: 12
