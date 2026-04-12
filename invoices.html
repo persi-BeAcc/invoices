@@ -1864,7 +1864,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.9")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.10")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2428,6 +2428,12 @@ function InvoiceForm(_ref7) {
   }, "Payment Received"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
       gap: 8
     }
   }, /*#__PURE__*/React.createElement(Field, {
@@ -2446,7 +2452,7 @@ function InvoiceForm(_ref7) {
   })), /*#__PURE__*/React.createElement(Field, {
     label: "Date",
     style: {
-      flex: 1
+      flex: 1.6
     }
   }, /*#__PURE__*/React.createElement("input", {
     style: inp(),
@@ -2455,11 +2461,8 @@ function InvoiceForm(_ref7) {
     onChange: function onChange(e) {
       return set("paidDate", e.target.value);
     }
-  })), /*#__PURE__*/React.createElement(Field, {
-    label: "Method",
-    style: {
-      flex: 1
-    }
+  }))), /*#__PURE__*/React.createElement(Field, {
+    label: "Method"
   }, /*#__PURE__*/React.createElement("input", {
     style: inp(),
     value: inv.paymentMethod || "",
