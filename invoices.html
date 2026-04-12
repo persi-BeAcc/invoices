@@ -1435,31 +1435,37 @@ function App() {
     _useState8 = _slicedToArray(_useState7, 2),
     catalog = _useState8[0],
     setCatalog = _useState8[1];
-  var _useState9 = useState(null),
+  var _useState9 = useState([]),
     _useState0 = _slicedToArray(_useState9, 2),
-    editing = _useState0[0],
-    setEditing = _useState0[1];
-  var _useState1 = useState("all"),
+    clients = _useState0[0],
+    setClients = _useState0[1];
+  var _useState1 = useState(null),
     _useState10 = _slicedToArray(_useState1, 2),
-    filter = _useState10[0],
-    setFilter = _useState10[1];
-  var _useState11 = useState(false),
+    editing = _useState10[0],
+    setEditing = _useState10[1];
+  var _useState11 = useState("all"),
     _useState12 = _slicedToArray(_useState11, 2),
-    pdfReady = _useState12[0],
-    setPdfReady = _useState12[1];
-  var _useState13 = useState(true),
+    filter = _useState12[0],
+    setFilter = _useState12[1];
+  var _useState13 = useState(false),
     _useState14 = _slicedToArray(_useState13, 2),
-    loading = _useState14[0],
-    setLoading = _useState14[1];
+    pdfReady = _useState14[0],
+    setPdfReady = _useState14[1];
+  var _useState15 = useState(true),
+    _useState16 = _slicedToArray(_useState15, 2),
+    loading = _useState16[0],
+    setLoading = _useState16[1];
   useEffect(function () {
-    Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog")]).then(function (_ref3) {
-      var _ref4 = _slicedToArray(_ref3, 3),
+    Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog"), sGet("inv_clients")]).then(function (_ref3) {
+      var _ref4 = _slicedToArray(_ref3, 4),
         invs = _ref4[0],
         sett = _ref4[1],
-        cat = _ref4[2];
+        cat = _ref4[2],
+        cls = _ref4[3];
       if (invs) setInvoices(invs);
       if (sett) setSettings(_objectSpread(_objectSpread({}, defaultSettings), sett));
       if (cat) setCatalog(cat);
+      if (cls) setClients(cls);
       setLoading(false);
     });
     var s = document.createElement("script");
@@ -1480,6 +1486,10 @@ function App() {
   var saveCatalog = function saveCatalog(c) {
     setCatalog(c);
     sSet("inv_catalog", c);
+  };
+  var saveClients = function saveClients(c) {
+    setClients(c);
+    sSet("inv_clients", c);
   };
   var openNew = function openNew() {
     var nums = invoices.map(function (i) {
@@ -1520,8 +1530,29 @@ function App() {
     if (detectedName && !settings.name) saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
       name: detectedName
     }));
+
+    // Auto-extract unique clients from imported invoices
+    var existingClientNames = new Set(clients.map(function (c) {
+      return c.name.toLowerCase();
+    }));
+    var newClients = [];
+    invs.forEach(function (inv) {
+      var _inv$to5;
+      var name = (_inv$to5 = inv.to) === null || _inv$to5 === void 0 || (_inv$to5 = _inv$to5.name) === null || _inv$to5 === void 0 ? void 0 : _inv$to5.trim();
+      if (name && !existingClientNames.has(name.toLowerCase())) {
+        var _inv$to6, _inv$to7;
+        existingClientNames.add(name.toLowerCase());
+        newClients.push({
+          id: uid(),
+          name: name,
+          email: ((_inv$to6 = inv.to) === null || _inv$to6 === void 0 ? void 0 : _inv$to6.email) || "",
+          address: ((_inv$to7 = inv.to) === null || _inv$to7 === void 0 ? void 0 : _inv$to7.address) || "",
+          phone: ""
+        });
+      }
+    });
+    if (newClients.length) saveClients([].concat(_toConsumableArray(clients), newClients));
     if (mode === "add") {
-      // Only add invoices whose number doesn't already exist
       var existing = new Set(invoices.map(function (i) {
         return i.number;
       }));
@@ -1535,7 +1566,6 @@ function App() {
       };
     }
     if (mode === "upsert") {
-      // Update matching invoices from file, add new ones, keep app-only invoices intact
       var fileByNumber = new Map(invs.map(function (i) {
         return [i.number, i];
       }));
@@ -1577,7 +1607,9 @@ function App() {
     invoice: editing,
     settings: settings,
     catalog: catalog,
+    clients: clients,
     onSaveCatalog: saveCatalog,
+    onSaveClients: saveClients,
     pdfReady: pdfReady,
     onSave: saveInvoice,
     onDelete: deleteInvoice,
@@ -1599,6 +1631,13 @@ function App() {
       return setScreen("list");
     }
   });
+  if (screen === "clients") return /*#__PURE__*/React.createElement(ClientsScreen, {
+    clients: clients,
+    onSave: saveClients,
+    onBack: function onBack() {
+      return setScreen("list");
+    }
+  });
   return /*#__PURE__*/React.createElement(InvoiceList, {
     invoices: invoices,
     filter: filter,
@@ -1610,6 +1649,9 @@ function App() {
     },
     onCatalog: function onCatalog() {
       return setScreen("catalog");
+    },
+    onClients: function onClients() {
+      return setScreen("clients");
     },
     onImport: handleImport,
     onExport: function onExport() {
@@ -1629,16 +1671,17 @@ function InvoiceList(_ref5) {
     onOpen = _ref5.onOpen,
     onSettings = _ref5.onSettings,
     onCatalog = _ref5.onCatalog,
+    onClients = _ref5.onClients,
     onImport = _ref5.onImport,
     onExport = _ref5.onExport;
-  var _useState15 = useState(false),
-    _useState16 = _slicedToArray(_useState15, 2),
-    menuOpen = _useState16[0],
-    setMenuOpen = _useState16[1];
-  var _useState17 = useState(""),
+  var _useState17 = useState(false),
     _useState18 = _slicedToArray(_useState17, 2),
-    importMsg = _useState18[0],
-    setImportMsg = _useState18[1];
+    menuOpen = _useState18[0],
+    setMenuOpen = _useState18[1];
+  var _useState19 = useState(""),
+    _useState20 = _slicedToArray(_useState19, 2),
+    importMsg = _useState20[0],
+    setImportMsg = _useState20[1];
   var fileRef = useRef();
   var replaceRef = useRef();
 
@@ -1794,7 +1837,18 @@ function InvoiceList(_ref5) {
       padding: "4px 10px",
       borderRadius: 8
     }
-  }, "\uD83D\uDCE6 Items")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCE6 Items"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClients,
+    style: {
+      background: "none",
+      border: "1px solid rgba(255,255,255,.25)",
+      color: "rgba(255,255,255,.8)",
+      fontSize: 12,
+      cursor: "pointer",
+      padding: "4px 10px",
+      borderRadius: 8
+    }
+  }, "\uD83D\uDC64 Clients")), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -1810,7 +1864,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.8")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.9")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2009,7 +2063,7 @@ function InvoiceList(_ref5) {
         letterSpacing: 1
       }
     }, /*#__PURE__*/React.createElement("span", null, yr), /*#__PURE__*/React.createElement("span", null, fmtMoney(yrTotal))), list.map(function (inv) {
-      var _inv$to5;
+      var _inv$to8;
       var _calc3 = calc(inv),
         total = _calc3.total;
       var over = isOverdue(inv);
@@ -2048,7 +2102,7 @@ function InvoiceList(_ref5) {
           textOverflow: "ellipsis",
           whiteSpace: "nowrap"
         }
-      }, ((_inv$to5 = inv.to) === null || _inv$to5 === void 0 ? void 0 : _inv$to5.name) || "—"), /*#__PURE__*/React.createElement("div", {
+      }, ((_inv$to8 = inv.to) === null || _inv$to8 === void 0 ? void 0 : _inv$to8.name) || "—"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 12,
           color: "#999"
@@ -2106,31 +2160,37 @@ function InvoiceList(_ref5) {
    INVOICE FORM
 ═══════════════════════════════════════════════════════════════════ */
 function InvoiceForm(_ref7) {
-  var _inv$to6, _inv$to7, _inv$to8;
+  var _inv$to9, _inv$to0, _inv$to1;
   var invoice = _ref7.invoice,
     settings = _ref7.settings,
     catalog = _ref7.catalog,
+    clients = _ref7.clients,
     onSaveCatalog = _ref7.onSaveCatalog,
+    onSaveClients = _ref7.onSaveClients,
     pdfReady = _ref7.pdfReady,
     onSave = _ref7.onSave,
     onDelete = _ref7.onDelete,
     onBack = _ref7.onBack;
-  var _useState19 = useState(invoice),
-    _useState20 = _slicedToArray(_useState19, 2),
-    inv = _useState20[0],
-    setInv = _useState20[1];
-  var _useState21 = useState(false),
+  var _useState21 = useState(invoice),
     _useState22 = _slicedToArray(_useState21, 2),
-    showDel = _useState22[0],
-    setShowDel = _useState22[1];
+    inv = _useState22[0],
+    setInv = _useState22[1];
   var _useState23 = useState(false),
     _useState24 = _slicedToArray(_useState23, 2),
-    sharing = _useState24[0],
-    setSharing = _useState24[1];
+    showDel = _useState24[0],
+    setShowDel = _useState24[1];
   var _useState25 = useState(false),
     _useState26 = _slicedToArray(_useState25, 2),
-    catalogOpen = _useState26[0],
-    setCatalogOpen = _useState26[1];
+    sharing = _useState26[0],
+    setSharing = _useState26[1];
+  var _useState27 = useState(false),
+    _useState28 = _slicedToArray(_useState27, 2),
+    catalogOpen = _useState28[0],
+    setCatalogOpen = _useState28[1];
+  var _useState29 = useState(false),
+    _useState30 = _slicedToArray(_useState29, 2),
+    clientOpen = _useState30[0],
+    setClientOpen = _useState30[1];
   var totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
@@ -2464,11 +2524,31 @@ function InvoiceForm(_ref7) {
       flexDirection: "column",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement(Field, {
-    label: "Client Name"
-  }, /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Client Name"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return setClientOpen(true);
+    },
+    style: {
+      background: "none",
+      border: "1px solid ".concat(T.border),
+      borderRadius: 8,
+      padding: "3px 10px",
+      fontSize: 12,
+      cursor: "pointer",
+      color: T.blue
+    }
+  }, "\uD83D\uDC64 Clients")), /*#__PURE__*/React.createElement("input", {
     style: inp(),
-    value: ((_inv$to6 = inv.to) === null || _inv$to6 === void 0 ? void 0 : _inv$to6.name) || "",
+    value: ((_inv$to9 = inv.to) === null || _inv$to9 === void 0 ? void 0 : _inv$to9.name) || "",
     onChange: function onChange(e) {
       return set("to.name", e.target.value);
     },
@@ -2478,7 +2558,7 @@ function InvoiceForm(_ref7) {
   }, /*#__PURE__*/React.createElement("input", {
     style: inp(),
     type: "email",
-    value: ((_inv$to7 = inv.to) === null || _inv$to7 === void 0 ? void 0 : _inv$to7.email) || "",
+    value: ((_inv$to0 = inv.to) === null || _inv$to0 === void 0 ? void 0 : _inv$to0.email) || "",
     onChange: function onChange(e) {
       return set("to.email", e.target.value);
     },
@@ -2491,7 +2571,7 @@ function InvoiceForm(_ref7) {
       minHeight: 56,
       lineHeight: 1.5
     }),
-    value: ((_inv$to8 = inv.to) === null || _inv$to8 === void 0 ? void 0 : _inv$to8.address) || "",
+    value: ((_inv$to1 = inv.to) === null || _inv$to1 === void 0 ? void 0 : _inv$to1.address) || "",
     onChange: function onChange(e) {
       return set("to.address", e.target.value);
     },
@@ -2871,7 +2951,123 @@ function InvoiceForm(_ref7) {
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "Cancel")))), catalogOpen && /*#__PURE__*/React.createElement("div", {
+  }, "Cancel")))), clientOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,.5)",
+      zIndex: 100,
+      display: "flex",
+      alignItems: "flex-end"
+    },
+    onClick: function onClick() {
+      return setClientOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: "16px 16px 0 0",
+      width: "100%",
+      maxHeight: "65vh",
+      overflow: "auto",
+      padding: 16
+    },
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      marginBottom: 12
+    }
+  }, "Clients"), (clients || []).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#999",
+      fontSize: 14,
+      padding: "20px 0",
+      textAlign: "center"
+    }
+  }, "No saved clients yet.", /*#__PURE__*/React.createElement("br", null), "Import your XLSX or add from the Clients screen."), (clients || []).map(function (cl) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: cl.id,
+      onClick: function onClick() {
+        setInv(function (p) {
+          var _p$to, _p$to2;
+          return _objectSpread(_objectSpread({}, p), {}, {
+            to: _objectSpread(_objectSpread({}, p.to), {}, {
+              name: cl.name,
+              email: cl.email || ((_p$to = p.to) === null || _p$to === void 0 ? void 0 : _p$to.email),
+              address: cl.address || ((_p$to2 = p.to) === null || _p$to2 === void 0 ? void 0 : _p$to2.address)
+            })
+          });
+        });
+        setClientOpen(false);
+      },
+      style: {
+        padding: "12px 0",
+        borderBottom: "1px solid ".concat(T.border),
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 14
+      }
+    }, cl.name), cl.email && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#888"
+      }
+    }, cl.email)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: T.blue,
+        fontSize: 20
+      }
+    }, "+"));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      var _inv$to10, _inv$to11, _inv$to12;
+      var name = (_inv$to10 = inv.to) === null || _inv$to10 === void 0 || (_inv$to10 = _inv$to10.name) === null || _inv$to10 === void 0 ? void 0 : _inv$to10.trim();
+      if (!name) {
+        alert("Fill in a client name first.");
+        return;
+      }
+      if ((clients || []).some(function (c) {
+        return c.name.toLowerCase() === name.toLowerCase();
+      })) {
+        alert("Client already saved.");
+        return;
+      }
+      var next = [].concat(_toConsumableArray(clients || []), [{
+        id: uid(),
+        name: name,
+        email: ((_inv$to11 = inv.to) === null || _inv$to11 === void 0 ? void 0 : _inv$to11.email) || "",
+        address: ((_inv$to12 = inv.to) === null || _inv$to12 === void 0 ? void 0 : _inv$to12.address) || "",
+        phone: ""
+      }]);
+      onSaveClients(next);
+      alert("Client saved!");
+    },
+    style: {
+      background: "none",
+      border: "1.5px solid ".concat(T.blue),
+      color: T.blue,
+      padding: "8px 20px",
+      borderRadius: 8,
+      fontWeight: 600,
+      cursor: "pointer",
+      fontSize: 13
+    }
+  }, "Save current client")))), catalogOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -2982,10 +3178,10 @@ function SettingsScreen(_ref1) {
   var settings = _ref1.settings,
     onSave = _ref1.onSave,
     onBack = _ref1.onBack;
-  var _useState27 = useState(settings),
-    _useState28 = _slicedToArray(_useState27, 2),
-    s = _useState28[0],
-    setS = _useState28[1];
+  var _useState31 = useState(settings),
+    _useState32 = _slicedToArray(_useState31, 2),
+    s = _useState32[0],
+    setS = _useState32[1];
   var set = function set(k, v) {
     return setS(function (p) {
       return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k, v));
@@ -3270,7 +3466,7 @@ function CatalogScreen(_ref12) {
   var catalog = _ref12.catalog,
     onSave = _ref12.onSave,
     onBack = _ref12.onBack;
-  var _useState29 = useState(function () {
+  var _useState33 = useState(function () {
       try {
         var v = localStorage.getItem("inv_catalog");
         return v ? JSON.parse(v) : catalog || [];
@@ -3278,21 +3474,21 @@ function CatalogScreen(_ref12) {
         return catalog || [];
       }
     }),
-    _useState30 = _slicedToArray(_useState29, 2),
-    items = _useState30[0],
-    setItems = _useState30[1];
-  var _useState31 = useState({
+    _useState34 = _slicedToArray(_useState33, 2),
+    items = _useState34[0],
+    setItems = _useState34[1];
+  var _useState35 = useState({
       desc: "",
       rate: "",
       unit: ""
     }),
-    _useState32 = _slicedToArray(_useState31, 2),
-    form = _useState32[0],
-    setForm = _useState32[1];
-  var _useState33 = useState(false),
-    _useState34 = _slicedToArray(_useState33, 2),
-    saved = _useState34[0],
-    setSaved = _useState34[1];
+    _useState36 = _slicedToArray(_useState35, 2),
+    form = _useState36[0],
+    setForm = _useState36[1];
+  var _useState37 = useState(false),
+    _useState38 = _slicedToArray(_useState37, 2),
+    saved = _useState38[0],
+    setSaved = _useState38[1];
   var onSaveRef = useRef(onSave);
   useEffect(function () {
     onSaveRef.current = onSave;
@@ -3510,6 +3706,272 @@ function CatalogScreen(_ref12) {
         fontSize: 18,
         cursor: "pointer",
         padding: "4px 8px"
+      }
+    }, "\xD7"));
+  }))));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLIENTS SCREEN
+═══════════════════════════════════════════════════════════════════ */
+function ClientsScreen(_ref13) {
+  var clients = _ref13.clients,
+    onSave = _ref13.onSave,
+    onBack = _ref13.onBack;
+  var _useState39 = useState(function () {
+      try {
+        var v = localStorage.getItem("inv_clients");
+        return v ? JSON.parse(v) : clients || [];
+      } catch (_unused5) {
+        return clients || [];
+      }
+    }),
+    _useState40 = _slicedToArray(_useState39, 2),
+    items = _useState40[0],
+    setItems = _useState40[1];
+  var _useState41 = useState({
+      name: "",
+      email: "",
+      phone: "",
+      address: ""
+    }),
+    _useState42 = _slicedToArray(_useState41, 2),
+    form = _useState42[0],
+    setForm = _useState42[1];
+  var _useState43 = useState(false),
+    _useState44 = _slicedToArray(_useState43, 2),
+    saved = _useState44[0],
+    setSaved = _useState44[1];
+  var onSaveRef = useRef(onSave);
+  useEffect(function () {
+    onSaveRef.current = onSave;
+  });
+  var persist = function persist(next) {
+    setItems(next);
+    try {
+      localStorage.setItem("inv_clients", JSON.stringify(next));
+    } catch (_unused6) {}
+    onSaveRef.current(next);
+    setSaved(true);
+    setTimeout(function () {
+      return setSaved(false);
+    }, 1500);
+  };
+  var add = function add() {
+    if (!form.name.trim()) return;
+    persist([].concat(_toConsumableArray(items), [_objectSpread(_objectSpread({}, form), {}, {
+      name: form.name.trim(),
+      id: uid()
+    })]));
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      address: ""
+    });
+  };
+  var remove = function remove(id) {
+    return persist(items.filter(function (i) {
+      return i.id !== id;
+    }));
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: "100vh",
+      background: T.bg,
+      fontFamily: "'DM Sans',system-ui,sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement(Fonts, null), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: T.navy,
+      padding: "14px 16px",
+      position: "sticky",
+      top: 0,
+      zIndex: 20,
+      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onBack,
+    style: {
+      background: "none",
+      border: "none",
+      color: "rgba(255,255,255,.8)",
+      fontSize: 15,
+      cursor: "pointer",
+      padding: "4px 0"
+    }
+  }, "\u2039 Back"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 17
+    }
+  }, "Clients"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: saved ? "#6EE7A0" : "transparent",
+      transition: "color .3s",
+      minWidth: 40,
+      textAlign: "right"
+    }
+  }, "Saved \u2713"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 0 80px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: cardStyle()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: T.blue,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 12
+    }
+  }, "Add Client"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Name"), /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    value: form.name,
+    onChange: function onChange(e) {
+      return setForm(function (p) {
+        return _objectSpread(_objectSpread({}, p), {}, {
+          name: e.target.value
+        });
+      });
+    },
+    placeholder: "Altitude Technology Group, LLC"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Email"), /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "email",
+    value: form.email,
+    onChange: function onChange(e) {
+      return setForm(function (p) {
+        return _objectSpread(_objectSpread({}, p), {}, {
+          email: e.target.value
+        });
+      });
+    },
+    placeholder: "ap@example.com"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Phone"), /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "tel",
+    value: form.phone,
+    onChange: function onChange(e) {
+      return setForm(function (p) {
+        return _objectSpread(_objectSpread({}, p), {}, {
+          phone: e.target.value
+        });
+      });
+    },
+    placeholder: "+1 555\u2026"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Address"), /*#__PURE__*/React.createElement("textarea", {
+    style: _objectSpread(_objectSpread({}, inp()), {}, {
+      resize: "vertical",
+      minHeight: 56,
+      lineHeight: 1.5
+    }),
+    value: form.address,
+    onChange: function onChange(e) {
+      return setForm(function (p) {
+        return _objectSpread(_objectSpread({}, p), {}, {
+          address: e.target.value
+        });
+      });
+    },
+    placeholder: "Street, City, Country"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: add,
+    style: {
+      width: "100%",
+      padding: "11px",
+      background: T.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "+ Add Client"))), /*#__PURE__*/React.createElement("div", {
+    style: cardStyle()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: T.blue,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 12
+    }
+  }, "Saved Clients"), items.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#999",
+      fontSize: 14,
+      textAlign: "center",
+      padding: "20px 0"
+    }
+  }, "No clients yet.", /*#__PURE__*/React.createElement("br", null), "Import your XLSX to auto-populate."), items.map(function (cl) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: cl.id,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        padding: "10px 0",
+        borderBottom: "1px solid ".concat(T.border)
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 14
+      }
+    }, cl.name), cl.email && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#888"
+      }
+    }, cl.email), cl.phone && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#888"
+      }
+    }, cl.phone), cl.address && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#aaa"
+      }
+    }, cl.address)), /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        return remove(cl.id);
+      },
+      style: {
+        background: "none",
+        border: "none",
+        color: "#C09090",
+        fontSize: 18,
+        cursor: "pointer",
+        padding: "4px 8px",
+        flexShrink: 0
       }
     }, "\xD7"));
   }))));
