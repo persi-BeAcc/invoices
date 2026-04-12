@@ -1665,6 +1665,14 @@ function App() {
     }) : [inv].concat(_toConsumableArray(invoices)));
     setScreen("list");
   };
+  var updateInvoice = function updateInvoice(inv) {
+    var idx = invoices.findIndex(function (i) {
+      return i.id === inv.id;
+    });
+    if (idx >= 0) saveInvoices(invoices.map(function (i) {
+      return i.id === inv.id ? inv : i;
+    }));
+  };
   var deleteInvoice = function deleteInvoice(id) {
     saveInvoices(invoices.filter(function (i) {
       return i.id !== id;
@@ -1825,12 +1833,326 @@ function App() {
     onClients: function onClients() {
       return setScreen("clients");
     },
+    onSave: updateInvoice,
     onImport: handleImport,
     onExport: function onExport() {
       return exportXLSX(invoices, settings, clients);
     }
   });
 }
+
+/* ─── Mark Paid Modal ────────────────────────────────────────────── */
+var MarkPaidModal = function MarkPaidModal(_ref_mp) {
+  var inv = _ref_mp.inv,
+    onClose = _ref_mp.onClose,
+    onConfirm = _ref_mp.onConfirm;
+  var _bal = calc(inv).balance;
+  var _useState_mp1 = useState(_bal > 0 ? String(_bal.toFixed(2)) : ""),
+    _useState_mp2 = _slicedToArray(_useState_mp1, 2),
+    amount = _useState_mp2[0],
+    setAmount = _useState_mp2[1];
+  var _useState_mp3 = useState(todayStr()),
+    _useState_mp4 = _slicedToArray(_useState_mp3, 2),
+    mpDate = _useState_mp4[0],
+    setMpDate = _useState_mp4[1];
+  var _useState_mp5 = useState("BANK"),
+    _useState_mp6 = _slicedToArray(_useState_mp5, 2),
+    method = _useState_mp6[0],
+    setMethod = _useState_mp6[1];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,.45)",
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: "16px 16px 0 0",
+      padding: "20px 16px 36px",
+      width: "100%"
+    },
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 17,
+      marginBottom: 16,
+      color: T.textDark
+    }
+  }, "Mark as Paid"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 10,
+      width: "100%"
+    }
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Amount",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "number",
+    value: amount,
+    onChange: function onChange(e) {
+      return setAmount(e.target.value);
+    }
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Date",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "date",
+    value: mpDate,
+    onChange: function onChange(e) {
+      return setMpDate(e.target.value);
+    }
+  }))), /*#__PURE__*/React.createElement(Field, {
+    label: "Payment Method"
+  }, /*#__PURE__*/React.createElement("select", {
+    style: inp(),
+    value: method,
+    onChange: function onChange(e) {
+      return setMethod(e.target.value);
+    }
+  }, ["BANK", "WIRE", "WISE", "CHECK", "CASH", "OTHER"].map(function (m) {
+    return /*#__PURE__*/React.createElement("option", {
+      key: m,
+      value: m
+    }, m);
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      flex: 1,
+      padding: "13px",
+      background: "#F0EDE8",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      onConfirm({
+        status: "paid",
+        payments: parseFloat(amount) || 0,
+        paidDate: mpDate,
+        paymentMethod: method
+      });
+    },
+    style: {
+      flex: 1,
+      padding: "13px",
+      background: "#1A7A4A",
+      color: "#fff",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "\u2713 Confirm Paid"))));
+};
+
+/* ─── Swipe Row ──────────────────────────────────────────────────── */
+var SwipeRow = function SwipeRow(_ref_sr) {
+  var inv = _ref_sr.inv,
+    onOpen = _ref_sr.onOpen,
+    onSave = _ref_sr.onSave;
+  var _useState_sr1 = useState(0),
+    _useState_sr2 = _slicedToArray(_useState_sr1, 2),
+    offset = _useState_sr2[0],
+    setOffset = _useState_sr2[1];
+  var _useState_sr3 = useState(false),
+    _useState_sr4 = _slicedToArray(_useState_sr3, 2),
+    swiping = _useState_sr4[0],
+    setSwiping = _useState_sr4[1];
+  var _useState_sr5 = useState(false),
+    _useState_sr6 = _slicedToArray(_useState_sr5, 2),
+    showModal = _useState_sr6[0],
+    setShowModal = _useState_sr6[1];
+  var startX = useRef(0);
+  var startY = useRef(0);
+  var dirLocked = useRef(null);
+  var REVEAL = 80;
+  var _inv$toSr;
+  var _calcSr = calc(inv),
+    total = _calcSr.total;
+  var over = isOverdue(inv);
+  var bc = inv.status === "paid" ? "#1A7A4A" : over ? "#C43636" : inv.status === "sent" ? "#C4A020" : "#CCC";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      overflow: "hidden",
+      margin: "0 12px 1px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: REVEAL,
+      background: "#1A7A4A",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick(e) {
+      e.stopPropagation();
+      setOffset(0);
+      setShowModal(true);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: "#fff",
+      cursor: "pointer",
+      textAlign: "center",
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      lineHeight: 1
+    }
+  }, "\u2713"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      marginTop: 3
+    }
+  }, "Mark Paid"))), /*#__PURE__*/React.createElement("div", {
+    onTouchStart: function onTouchStart(e) {
+      startX.current = e.touches[0].clientX;
+      startY.current = e.touches[0].clientY;
+      dirLocked.current = null;
+      setSwiping(true);
+    },
+    onTouchMove: function onTouchMove(e) {
+      var dx = e.touches[0].clientX - startX.current;
+      var dy = e.touches[0].clientY - startY.current;
+      if (dirLocked.current === null) {
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+          dirLocked.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+        }
+        return;
+      }
+      if (dirLocked.current === "v") return;
+      setOffset(Math.min(0, Math.max(-(REVEAL + 20), dx)));
+    },
+    onTouchEnd: function onTouchEnd() {
+      setSwiping(false);
+      setOffset(function (prev) {
+        return prev <= -60 ? -REVEAL : 0;
+      });
+    },
+    onClick: function onClick() {
+      if (offset < -10) {
+        setOffset(0);
+      } else {
+        onOpen(inv);
+      }
+    },
+    style: {
+      background: "#fff",
+      padding: "13px 14px",
+      cursor: "pointer",
+      borderLeft: "3px solid ".concat(bc),
+      transform: "translateX(".concat(offset, "px)"),
+      transition: swiping ? "none" : "transform 0.2s ease",
+      touchAction: "pan-y",
+      willChange: "transform"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 15,
+      color: T.textDark,
+      marginBottom: 2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, ((_inv$toSr = inv.to) === null || _inv$toSr === void 0 ? void 0 : _inv$toSr.name) || "\u2014"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#999"
+    }
+  }, inv.number)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: T.textDark,
+      whiteSpace: "nowrap"
+    }
+  }, fmtMoney(total)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement(Badge, {
+    inv: inv
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      fontSize: 12,
+      color: over ? "#C43636" : inv.status === "paid" ? "#1A7A4A" : "#888"
+    }
+  }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.paidDate || inv.dueDate || inv.date)).concat(inv.paymentMethod ? " \u00b7 " + inv.paymentMethod : "") : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"), inv.emailStatus ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 2,
+      fontSize: 11,
+      fontWeight: 600,
+      color: inv.emailStatus === "opened" ? "#15803D" : "#3654C4"
+    }
+  }, inv.emailStatus === "opened" ? "\uD83D\uDC41 Opened" : inv.emailStatus === "delivered" ? "\u2713 Delivered" : "\u2709 Email sent") : null), showModal ? /*#__PURE__*/React.createElement(MarkPaidModal, {
+    inv: inv,
+    onClose: function onClose() {
+      return setShowModal(false);
+    },
+    onConfirm: function onConfirm(payment) {
+      onSave(_objectSpread(_objectSpread({}, inv), payment));
+      setShowModal(false);
+    }
+  }) : null);
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    INVOICE LIST
@@ -1844,6 +2166,7 @@ function InvoiceList(_ref5) {
     onSettings = _ref5.onSettings,
     onCatalog = _ref5.onCatalog,
     onClients = _ref5.onClients,
+    onSave = _ref5.onSave,
     onImport = _ref5.onImport,
     onExport = _ref5.onExport;
   var _useState17 = useState(false),
@@ -2038,7 +2361,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.16")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.17")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2237,82 +2560,12 @@ function InvoiceList(_ref5) {
         letterSpacing: 1
       }
     }, /*#__PURE__*/React.createElement("span", null, yr), /*#__PURE__*/React.createElement("span", null, fmtMoney(yrTotal))), list.map(function (inv) {
-      var _inv$to8;
-      var _calc3 = calc(inv),
-        total = _calc3.total;
-      var over = isOverdue(inv);
-      var bc = inv.status === "paid" ? "#1A7A4A" : over ? "#C43636" : inv.status === "sent" ? "#C4A020" : "#CCC";
-      return /*#__PURE__*/React.createElement("div", {
+      return /*#__PURE__*/React.createElement(SwipeRow, {
         key: inv.id,
-        onClick: function onClick() {
-          return onOpen(inv);
-        },
-        style: {
-          background: "#fff",
-          margin: "0 12px 1px",
-          padding: "13px 14px",
-          cursor: "pointer",
-          borderLeft: "3px solid ".concat(bc)
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 8
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          flex: 1,
-          minWidth: 0
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontWeight: 600,
-          fontSize: 15,
-          color: T.textDark,
-          marginBottom: 2,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap"
-        }
-      }, ((_inv$to8 = inv.to) === null || _inv$to8 === void 0 ? void 0 : _inv$to8.name) || "—"), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 12,
-          color: "#999"
-        }
-      }, inv.number)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          textAlign: "right",
-          flexShrink: 0
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontWeight: 700,
-          fontSize: 15,
-          color: T.textDark,
-          whiteSpace: "nowrap"
-        }
-      }, fmtMoney(total)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 2
-        }
-      }, /*#__PURE__*/React.createElement(Badge, {
-        inv: inv
-      })))), /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 4,
-          fontSize: 12,
-          color: over ? "#C43636" : inv.status === "paid" ? "#1A7A4A" : "#888"
-        }
-      }, inv.status === "paid" ? "Paid ".concat(fmtDate(inv.paidDate || inv.dueDate || inv.date)).concat(inv.paymentMethod ? " · " + inv.paymentMethod : "") : inv.dueDate ? "Due ".concat(fmtDate(inv.dueDate)) : "No due date"), inv.emailStatus ? /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 2,
-          fontSize: 11,
-          fontWeight: 600,
-          color: inv.emailStatus === "opened" ? "#15803D" : "#3654C4"
-        }
-      }, inv.emailStatus === "opened" ? "\uD83D\uDC41 Opened" : inv.emailStatus === "delivered" ? "\u2713 Delivered" : "\u2709 Email sent") : null);
+        inv: inv,
+        onOpen: onOpen,
+        onSave: onSave
+      });
     }));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: onNew,
