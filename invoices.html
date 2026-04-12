@@ -985,9 +985,11 @@ var importXLSX = function importXLSX(data) {
       paymentTerms: ""
     });
   }
+  var debug = "hdr@".concat(hdrIdx, " cols:[").concat(hdrs.slice(0, 6).join('|'), "] rows:").concat(invoices.length);
   return {
     invoices: invoices,
-    detectedName: detectedName
+    detectedName: detectedName,
+    debug: debug
   };
 };
 var exportXLSX = function exportXLSX(invoices, settings) {
@@ -1376,7 +1378,7 @@ function App() {
     setScreen("list");
   };
   var handleImport = function handleImport(invs, detectedName) {
-    var replace = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "add";
     var sort = function sort(list) {
       return list.slice().sort(function (a, b) {
         var na = parseInt(a.number.replace(/\D/g, "")) || 0,
@@ -1387,24 +1389,46 @@ function App() {
     if (detectedName && !settings.name) saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
       name: detectedName
     }));
-    if (replace) {
-      saveInvoices(sort(invs));
+    if (mode === "add") {
+      // Only add invoices whose number doesn't already exist
+      var existing = new Set(invoices.map(function (i) {
+        return i.number;
+      }));
+      var fresh = invs.filter(function (i) {
+        return !existing.has(i.number);
+      });
+      saveInvoices(sort([].concat(_toConsumableArray(invoices), _toConsumableArray(fresh))));
       return {
-        added: invs.length,
-        skipped: 0
+        added: fresh.length,
+        skipped: invs.length - fresh.length
       };
     }
-    var existing = new Set(invoices.map(function (i) {
-      return i.number;
-    }));
-    var fresh = invs.filter(function (i) {
-      return !existing.has(i.number);
-    });
-    saveInvoices(sort([].concat(_toConsumableArray(invoices), _toConsumableArray(fresh))));
-    return {
-      added: fresh.length,
-      skipped: invs.length - fresh.length
-    };
+    if (mode === "upsert") {
+      // Update matching invoices from file, add new ones, keep app-only invoices intact
+      var fileByNumber = new Map(invs.map(function (i) {
+        return [i.number, i];
+      }));
+      var appOnlyInvoices = invoices.filter(function (i) {
+        return !fileByNumber.has(i.number);
+      });
+      var merged = [].concat(_toConsumableArray(invs), _toConsumableArray(appOnlyInvoices));
+      var updated = invs.filter(function (i) {
+        return invoices.some(function (e) {
+          return e.number === i.number;
+        });
+      }).length;
+      var added = invs.filter(function (i) {
+        return !invoices.some(function (e) {
+          return e.number === i.number;
+        });
+      }).length;
+      saveInvoices(sort(merged));
+      return {
+        added: added,
+        updated: updated,
+        kept: appOnlyInvoices.length
+      };
+    }
   };
   if (loading) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1523,7 +1547,7 @@ function InvoiceList(_ref7) {
     return b - a;
   });
   var handleFile = function handleFile(e) {
-    var replace = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+    var mode = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "add";
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
@@ -1531,16 +1555,15 @@ function InvoiceList(_ref7) {
       try {
         var _importXLSX = importXLSX(new Uint8Array(ev.target.result)),
           parsed = _importXLSX.invoices,
-          detectedName = _importXLSX.detectedName;
-        var _onImport = onImport(parsed, detectedName, replace),
-          added = _onImport.added,
-          skipped = _onImport.skipped;
-        if (replace) {
-          setImportMsg("\u2713 Replaced all \u2014 ".concat(added, " invoice").concat(added !== 1 ? "s" : "", " loaded"));
-        } else if (skipped > 0 && added === 0) {
-          setImportMsg("\u2139 All ".concat(skipped, " invoices already exist. Use \"Replace all\" to re-import."));
+          detectedName = _importXLSX.detectedName,
+          debug = _importXLSX.debug;
+        var result = onImport(parsed, detectedName, mode);
+        if (parsed.length === 0) {
+          setImportMsg("\u26A0 Parsed 0 rows. Debug: ".concat(debug));
+        } else if (mode === "upsert") {
+          setImportMsg("\u2713 Synced \u2014 ".concat(result.added, " new, ").concat(result.updated, " updated, ").concat(result.kept, " kept"));
         } else {
-          setImportMsg("\u2713 Imported ".concat(added, " invoice").concat(added !== 1 ? "s" : "").concat(skipped > 0 ? " (".concat(skipped, " already existed)") : ""));
+          setImportMsg("\u2713 Imported ".concat(result.added).concat(result.skipped > 0 ? " (".concat(result.skipped, " already existed)") : ""));
         }
       } catch (err) {
         setImportMsg("\u2717 ".concat(err.message));
@@ -1656,7 +1679,7 @@ function InvoiceList(_ref7) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.2")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.4")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -1703,7 +1726,7 @@ function InvoiceList(_ref7) {
       fontSize: 14,
       borderBottom: "1px solid ".concat(T.border)
     }
-  }, "\u2191 Import XLSX"), /*#__PURE__*/React.createElement("button", {
+  }, "\u2191 Import new invoices"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       setMenuOpen(false);
       replaceRef.current.click();
@@ -1717,10 +1740,9 @@ function InvoiceList(_ref7) {
       textAlign: "left",
       cursor: "pointer",
       fontSize: 14,
-      borderBottom: "1px solid ".concat(T.border),
-      color: "#C43636"
+      borderBottom: "1px solid ".concat(T.border)
     }
-  }, "\u21BA Replace all (re-import)"), /*#__PURE__*/React.createElement("button", {
+  }, "\u21BA Sync from file (update existing)"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       setMenuOpen(false);
       onExport();
@@ -1743,7 +1765,7 @@ function InvoiceList(_ref7) {
       display: "none"
     },
     onChange: function onChange(e) {
-      return handleFile(e, false);
+      return handleFile(e, "add");
     }
   }), /*#__PURE__*/React.createElement("input", {
     ref: replaceRef,
@@ -1753,7 +1775,7 @@ function InvoiceList(_ref7) {
       display: "none"
     },
     onChange: function onChange(e) {
-      return handleFile(e, true);
+      return handleFile(e, "upsert");
     }
   }), importMsg && /*#__PURE__*/React.createElement("div", {
     style: {
