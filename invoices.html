@@ -863,12 +863,107 @@ var toISO = function toISO(v) {
   return "";
 };
 var importXLSX = function importXLSX(data) {
-  var _raw$;
   var wb = XLSX.read(data, {
     type: "array",
     cellDates: true
   });
-  var ws = wb.Sheets[wb.SheetNames[0]];
+  var sheetNames = wb.SheetNames;
+
+  // ── Parse "My Data" sheet ─────────────────────────────────────
+  var myData = null;
+  var mdSheetIdx = sheetNames.findIndex(function (n) {
+    return n.toLowerCase() === "my data";
+  });
+  if (mdSheetIdx >= 0) {
+    var mdWs = wb.Sheets[sheetNames[mdSheetIdx]];
+    var mdRaw = XLSX.utils.sheet_to_json(mdWs, {
+      header: 1,
+      defval: ""
+    });
+    var mdFieldMap = {
+      "business name": "name",
+      "business number": "bn",
+      "bn label": "bnLabel",
+      "address": "address",
+      "phone": "phone",
+      "email": "email",
+      "currency": "currency",
+      "currency code": "currencyCode",
+      "payment info": "paymentInfo"
+    };
+    var mdParsed = {};
+    mdRaw.forEach(function (row) {
+      var k = String(row[0] || "").toLowerCase().trim();
+      var v = String(row[1] || "").trim();
+      if (mdFieldMap[k] && v) mdParsed[mdFieldMap[k]] = v;
+    });
+    if (Object.keys(mdParsed).length) myData = mdParsed;
+  }
+
+  // ── Parse "Clients" sheet ─────────────────────────────────────
+  var importedClients = null;
+  var clSheetIdx = sheetNames.findIndex(function (n) {
+    return n.toLowerCase() === "clients";
+  });
+  if (clSheetIdx >= 0) {
+    var clWs = wb.Sheets[sheetNames[clSheetIdx]];
+    var clRaw = XLSX.utils.sheet_to_json(clWs, {
+      header: 1,
+      defval: ""
+    });
+    if (clRaw.length > 1) {
+      var clHdrs = clRaw[0].map(function (h) {
+        return String(h).toLowerCase().trim();
+      });
+      var cCol = function cCol() {
+        for (var _cLen = arguments.length, cNames = new Array(_cLen), _cKey = 0; _cKey < _cLen; _cKey++) {
+          cNames[_cKey] = arguments[_cKey];
+        }
+        var _cLoop = function _cLoop() {
+            var n = cNames[_ci];
+            var idx = clHdrs.findIndex(function (h) {
+              return h.includes(n);
+            });
+            if (idx >= 0) return {
+              v: idx
+            };
+          },
+          _cRet;
+        for (var _ci = 0; _ci < cNames.length; _ci++) {
+          _cRet = _cLoop();
+          if (_cRet) return _cRet.v;
+        }
+        return -1;
+      };
+      var cName = cCol("name");
+      var cContact = cCol("contact");
+      var cAddr = cCol("address");
+      var cEmail = cCol("email");
+      var cPhone = cCol("phone");
+      var parsedClients = [];
+      for (var ci = 1; ci < clRaw.length; ci++) {
+        var cr = clRaw[ci];
+        var cname = String(cName >= 0 ? cr[cName] || "" : "").trim();
+        if (!cname) continue;
+        parsedClients.push({
+          id: uid(),
+          name: cname,
+          contact: String(cContact >= 0 ? cr[cContact] || "" : "").trim(),
+          address: String(cAddr >= 0 ? cr[cAddr] || "" : "").trim(),
+          email: String(cEmail >= 0 ? cr[cEmail] || "" : "").trim(),
+          phone: String(cPhone >= 0 ? cr[cPhone] || "" : "").trim()
+        });
+      }
+      if (parsedClients.length) importedClients = parsedClients;
+    }
+  }
+
+  // ── Find invoice sheet ────────────────────────────────────────
+  // Prefer "Invoices" named sheet; fall back to first sheet
+  var invSheetName = sheetNames.find(function (n) {
+    return n.toLowerCase() === "invoices";
+  }) || sheetNames[0];
+  var ws = wb.Sheets[invSheetName];
   var raw = XLSX.utils.sheet_to_json(ws, {
     header: 1,
     defval: ""
@@ -911,7 +1006,8 @@ var importXLSX = function importXLSX(data) {
 
   // Detect business name - row 0 is "Invoice Summary - Business Name"
   var detectedName = "";
-  var titleCell = String(((_raw$ = raw[0]) === null || _raw$ === void 0 ? void 0 : _raw$[0]) || "").trim();
+  var _firstRow = raw[0];
+  var titleCell = String((_firstRow === null || _firstRow === void 0 ? void 0 : _firstRow[0]) || "").trim();
   if (titleCell.includes(" - ")) {
     detectedName = titleCell.split(" - ").slice(1).join(" - ").trim();
   }
@@ -1012,23 +1108,52 @@ var importXLSX = function importXLSX(data) {
   var debug = "hdr@".concat(hdrIdx, " cols:[").concat(hdrs.slice(0, 6).join('|'), "] rows:").concat(invoices.length);
   return {
     invoices: invoices,
+    myData: myData,
+    importedClients: importedClients,
     detectedName: detectedName,
     debug: debug
   };
 };
-var exportXLSX = function exportXLSX(invoices, settings) {
+var exportXLSX = function exportXLSX(invoices, settings, clients) {
   var sym = settings.currency || "$";
-  var rows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", ""]];
+
+  // ── My Data sheet ─────────────────────────────────────────────
+  var mdRows = [
+    ["Field", "Value"],
+    ["Business Name", settings.name || ""],
+    ["Business Number", settings.bn || ""],
+    ["BN Label", settings.bnLabel || ""],
+    ["Address", settings.address || ""],
+    ["Phone", settings.phone || ""],
+    ["Email", settings.email || ""],
+    ["Currency", settings.currency || ""],
+    ["Currency Code", settings.currencyCode || ""],
+    ["Payment Info", settings.paymentInfo || ""]
+  ];
+  var mdWs = XLSX.utils.aoa_to_sheet(mdRows);
+
+  // ── Clients sheet ─────────────────────────────────────────────
+  var clRows = [["Name", "Contact", "Address", "Email", "Phone"]];
+  (clients || []).forEach(function (c) {
+    clRows.push([c.name || "", c.contact || "", c.address || "", c.email || "", c.phone || ""]);
+  });
+  var clWs = XLSX.utils.aoa_to_sheet(clRows);
+
+  // ── Invoices sheet ────────────────────────────────────────────
+  var invRows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", ""]];
   invoices.forEach(function (inv) {
     var _inv$to;
     var _calc = calc(inv),
       total = _calc.total,
       balance = _calc.balance;
-    rows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", ""]);
+    invRows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", ""]);
   });
-  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var invWs = XLSX.utils.aoa_to_sheet(invRows);
+
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Invoices");
+  XLSX.utils.book_append_sheet(wb, mdWs, "My Data");
+  XLSX.utils.book_append_sheet(wb, clWs, "Clients");
+  XLSX.utils.book_append_sheet(wb, invWs, "Invoices");
   XLSX.writeFile(wb, "Invoices-Export-".concat(todayStr(), ".xlsx"));
 };
 
@@ -1520,6 +1645,8 @@ function App() {
   };
   var handleImport = function handleImport(invs, detectedName) {
     var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "add";
+    var myData = arguments.length > 3 ? arguments[3] : undefined;
+    var importedClients = arguments.length > 4 ? arguments[4] : undefined;
     var sort = function sort(list) {
       return list.slice().sort(function (a, b) {
         var na = parseInt(a.number.replace(/\D/g, "")) || 0,
@@ -1527,31 +1654,48 @@ function App() {
         return nb - na;
       });
     };
-    if (detectedName && !settings.name) saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
-      name: detectedName
-    }));
 
-    // Auto-extract unique clients from imported invoices
-    var existingClientNames = new Set(clients.map(function (c) {
-      return c.name.toLowerCase();
-    }));
-    var newClients = [];
-    invs.forEach(function (inv) {
-      var _inv$to5;
-      var name = (_inv$to5 = inv.to) === null || _inv$to5 === void 0 || (_inv$to5 = _inv$to5.name) === null || _inv$to5 === void 0 ? void 0 : _inv$to5.trim();
-      if (name && !existingClientNames.has(name.toLowerCase())) {
-        var _inv$to6, _inv$to7;
-        existingClientNames.add(name.toLowerCase());
-        newClients.push({
-          id: uid(),
-          name: name,
-          email: ((_inv$to6 = inv.to) === null || _inv$to6 === void 0 ? void 0 : _inv$to6.email) || "",
-          address: ((_inv$to7 = inv.to) === null || _inv$to7 === void 0 ? void 0 : _inv$to7.address) || "",
-          phone: ""
-        });
-      }
-    });
-    if (newClients.length) saveClients([].concat(_toConsumableArray(clients), newClients));
+    // Apply My Data settings if present, otherwise fall back to detected name
+    if (myData && Object.keys(myData).length) {
+      saveSettings(_objectSpread(_objectSpread({}, settings), myData));
+    } else if (detectedName && !settings.name) {
+      saveSettings(_objectSpread(_objectSpread({}, settings), {}, {
+        name: detectedName
+      }));
+    }
+
+    // Merge clients from dedicated Clients sheet (richer data: contact, address, phone)
+    if (importedClients && importedClients.length) {
+      var existingByName = new Map(clients.map(function (c) {
+        return [c.name.toLowerCase(), c];
+      }));
+      var clientsToAdd = importedClients.filter(function (ic) {
+        return !existingByName.has(ic.name.toLowerCase());
+      });
+      if (clientsToAdd.length) saveClients([].concat(_toConsumableArray(clients), _toConsumableArray(clientsToAdd)));
+    } else {
+      // Fallback: auto-extract unique clients from imported invoice rows
+      var existingClientNames = new Set(clients.map(function (c) {
+        return c.name.toLowerCase();
+      }));
+      var newClients = [];
+      invs.forEach(function (inv) {
+        var _inv$to5;
+        var name = (_inv$to5 = inv.to) === null || _inv$to5 === void 0 || (_inv$to5 = _inv$to5.name) === null || _inv$to5 === void 0 ? void 0 : _inv$to5.trim();
+        if (name && !existingClientNames.has(name.toLowerCase())) {
+          var _inv$to6, _inv$to7;
+          existingClientNames.add(name.toLowerCase());
+          newClients.push({
+            id: uid(),
+            name: name,
+            email: ((_inv$to6 = inv.to) === null || _inv$to6 === void 0 ? void 0 : _inv$to6.email) || "",
+            address: ((_inv$to7 = inv.to) === null || _inv$to7 === void 0 ? void 0 : _inv$to7.address) || "",
+            phone: ""
+          });
+        }
+      });
+      if (newClients.length) saveClients([].concat(_toConsumableArray(clients), newClients));
+    }
     if (mode === "add") {
       var existing = new Set(invoices.map(function (i) {
         return i.number;
@@ -1655,7 +1799,7 @@ function App() {
     },
     onImport: handleImport,
     onExport: function onExport() {
-      return exportXLSX(invoices, settings);
+      return exportXLSX(invoices, settings, clients);
     }
   });
 }
@@ -1730,8 +1874,10 @@ function InvoiceList(_ref5) {
         var _importXLSX = importXLSX(new Uint8Array(ev.target.result)),
           parsed = _importXLSX.invoices,
           detectedName = _importXLSX.detectedName,
-          debug = _importXLSX.debug;
-        var result = onImport(parsed, detectedName, mode);
+          debug = _importXLSX.debug,
+          myData = _importXLSX.myData,
+          importedClients = _importXLSX.importedClients;
+        var result = onImport(parsed, detectedName, mode, myData, importedClients);
         if (parsed.length === 0) {
           setImportMsg("\u26A0 Parsed 0 rows. Debug: ".concat(debug));
         } else if (mode === "upsert") {
