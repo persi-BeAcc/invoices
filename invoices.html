@@ -12,7 +12,7 @@
 <title>Invoices</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#F5F2EC;overflow-x:hidden;overscroll-behavior:none}
+html,body{height:100%;background:#F5F2EC;overflow-x:hidden;overscroll-behavior:none}#root{min-height:100%;display:flex;flex-direction:column}
 body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);-webkit-overflow-scrolling:touch}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
 @keyframes slideInFromRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
@@ -1909,7 +1909,7 @@ function App() {
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       key: screen,
-      style: { animation: (slideDir === 'right' ? 'slideInFromRight' : 'slideInFromLeft') + " 300ms ease-out" }
+      style: { animation: (slideDir === 'right' ? 'slideInFromRight' : 'slideInFromLeft') + " 300ms ease-out", minHeight: "100vh", display: "flex", flexDirection: "column" }
     }, currentScreen),
     /*#__PURE__*/React.createElement(ToastContainer, null));
 }
@@ -2395,6 +2395,9 @@ function InvoiceList(_ref5) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      flex: 1,
       background: T.bg,
       fontFamily: "'DM Sans',system-ui,sans-serif"
     }
@@ -2468,7 +2471,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.14.3")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.4")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2624,6 +2627,7 @@ function InvoiceList(_ref5) {
     activeBorder: "#C43636"
   }))), filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
+      flex: 1,
       textAlign: "center",
       padding: "70px 24px"
     }
@@ -2646,6 +2650,7 @@ function InvoiceList(_ref5) {
     }
   }, invoices.length === 0 ? "Tap + to create your first one" : "Tap the card again to show all")) : /*#__PURE__*/React.createElement("div", {
     style: {
+      flex: 1,
       paddingBottom: "calc(90px + env(safe-area-inset-bottom))"
     }
   }, years.map(function (yr) {
