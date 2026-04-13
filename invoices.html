@@ -1608,6 +1608,10 @@ function App() {
     _useState16 = _slicedToArray(_useState15, 2),
     loading = _useState16[0],
     setLoading = _useState16[1];
+  var _useStateT1 = useState(null),
+    _useStateT2 = _slicedToArray(_useStateT1, 2),
+    toast = _useStateT2[0],
+    setToast = _useStateT2[1];
   useEffect(function () {
     Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog"), sGet("inv_clients")]).then(function (_ref3) {
       var _ref4 = _slicedToArray(_ref3, 4),
@@ -1678,6 +1682,18 @@ function App() {
       return i.id !== id;
     }));
     setScreen("list");
+  };
+  var showToast = function showToast(msg) {
+    setToast(msg);
+    setTimeout(function () {
+      setToast(null);
+    }, 3500);
+  };
+  var onEmailSentNav = function onEmailSentNav(updatedInv) {
+    updateInvoice(updatedInv);
+    showToast("\u2713 Email sent for " + (updatedInv.number || "invoice"));
+    setScreen("list");
+    window.scrollTo(0, 0);
   };
   var handleImport = function handleImport(invs, detectedName) {
     var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "add";
@@ -1793,6 +1809,7 @@ function App() {
     pdfReady: pdfReady,
     onSave: saveInvoice,
     onDelete: deleteInvoice,
+    onEmailSentBack: onEmailSentNav,
     onBack: function onBack() {
       return setScreen("list");
     }
@@ -1818,7 +1835,26 @@ function App() {
       return setScreen("list");
     }
   });
-  return /*#__PURE__*/React.createElement(InvoiceList, {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, toast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 20,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 9999,
+      background: "#1B2B4B",
+      color: "#fff",
+      padding: "12px 22px",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 600,
+      fontFamily: "'DM Sans',system-ui,sans-serif",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
+      pointerEvents: "none",
+      whiteSpace: "nowrap",
+      letterSpacing: 0.2
+    }
+  }, toast), /*#__PURE__*/React.createElement(InvoiceList, {
     invoices: invoices,
     filter: filter,
     onFilter: setFilter,
@@ -1838,7 +1874,7 @@ function App() {
     onExport: function onExport() {
       return exportXLSX(invoices, settings, clients);
     }
-  });
+  }));
 }
 
 /* ─── Mark Paid Modal ────────────────────────────────────────────── */
@@ -2361,7 +2397,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.13.7")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.13.8")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2854,6 +2890,7 @@ function InvoiceForm(_ref7) {
     pdfReady = _ref7.pdfReady,
     onSave = _ref7.onSave,
     onDelete = _ref7.onDelete,
+    onEmailSentBack = _ref7.onEmailSentBack,
     onBack = _ref7.onBack;
   var _useState21 = useState(invoice),
     _useState22 = _slicedToArray(_useState21, 2),
@@ -2927,7 +2964,11 @@ function InvoiceForm(_ref7) {
   var onEmailSent = function onEmailSent(emailFields) {
     var updated = _objectSpread(_objectSpread({}, inv), emailFields);
     setInv(updated);
-    onSave(updated);
+    if (onEmailSentBack) {
+      onEmailSentBack(updated);
+    } else {
+      onSave(updated);
+    }
   };
   var doShare = /*#__PURE__*/function () {
     var _ref8 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
