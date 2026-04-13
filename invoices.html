@@ -2046,12 +2046,9 @@ var MarkPaidModal = function MarkPaidModal(_ref_mp) {
     }
   }, "Cancel"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      onConfirm({
-        status: "paid",
-        payments: parseFloat(amount) || 0,
-        paidDate: mpDate,
-        paymentMethod: method
-      });
+      var payment = { status: "paid", payments: parseFloat(amount) || 0, paidDate: mpDate, paymentMethod: method };
+      setSheetOpen(false);
+      setTimeout(function() { onConfirm(payment); }, 300);
     },
     style: {
       flex: 1,
@@ -2247,7 +2244,9 @@ var SwipeRow = function SwipeRow(_ref_sr) {
     },
     onConfirm: function onConfirm(payment) {
       onSave(_objectSpread(_objectSpread({}, inv), payment));
+      showToast("\u2713 " + (inv.number || "Invoice") + " marked as paid", "success");
       setShowModal(false);
+      window.scrollTo(0, 0);
     }
   }) : null);
 };
@@ -2469,7 +2468,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.14.2")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.3")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
