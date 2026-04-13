@@ -2361,7 +2361,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.13.1")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.13.2")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2602,7 +2602,7 @@ function SendEmailDialog(_ref_sd) {
   var _totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
-  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + code + " " + sym + _totals.balance.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\nPlease do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
+  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + sym + _totals.total.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\nPlease do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
   var _useState_sd1 = useState((inv.to && inv.to.email) || ""),
     _useState_sd2 = _slicedToArray(_useState_sd1, 2),
     to = _useState_sd2[0],

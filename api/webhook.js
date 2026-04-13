@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   // Resend sends webhook events as JSON with { type, data }
   // See: https://resend.com/docs/dashboard/webhooks/event-types
   const { type, data } = req.body || {};
-  const emailId = data?.email_id;
+  const emailId = data?.email_id || data?.id;
 
   if (!emailId) return res.status(400).json({ error: 'Missing email_id in payload' });
 
@@ -24,9 +24,15 @@ export default async function handler(req, res) {
 
   try {
     if (type === 'email.delivered') {
-      await kv.hset(key, { status: 'delivered', deliveredAt: now });
+      // Don't downgrade if already "opened" (events can arrive out of order)
+      const existing = await kv.hgetall(key);
+      if (existing?.status === 'opened') {
+        await kv.hset(key, { deliveredAt: now });
+      } else {
+        await kv.hset(key, { status: 'delivered', deliveredAt: now });
+      }
     } else if (type === 'email.opened') {
-      // Only upgrade status — don't overwrite "opened" back to "delivered"
+      // Always upgrade to "opened" — highest status
       await kv.hset(key, { status: 'opened', openedAt: now });
     } else if (type === 'email.bounced' || type === 'email.complained') {
       await kv.hset(key, { status: 'failed', failedAt: now });
