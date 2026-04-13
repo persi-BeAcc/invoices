@@ -2361,7 +2361,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.19")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.13.1")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2641,8 +2641,8 @@ function SendEmailDialog(_ref_sd) {
     setMsg("");
     var pdfBase64, htmlBody;
     try {
-      var pdfBytes = buildPDF(inv, settings).output("uint8array");
-      pdfBase64 = btoa(Array.from(pdfBytes, function(b) { return String.fromCharCode(b); }).join(""));
+      var pdfDataUri = buildPDF(inv, settings).output("datauristring");
+      pdfBase64 = pdfDataUri.split(",")[1];
       htmlBody = buildEmailHTML(body, settings);
     } catch (e) {
       setMsg("Error preparing email: " + e.message);
