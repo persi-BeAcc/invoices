@@ -6,7 +6,7 @@ const kv = createClient({
 });
 
 // Send a push notification via ntfy.sh — skipped if NTFY_TOPIC is not set
-async function sendNtfy(title, message, tags = []) {
+async function sendNtfy(title, message, tags = [], priority = '3') {
   const topic = process.env.NTFY_TOPIC;
   if (!topic) {
     console.warn('[ntfy] NTFY_TOPIC not set — skipping notification');
@@ -19,7 +19,7 @@ async function sendNtfy(title, message, tags = []) {
       headers: {
         'Title': title,
         'Tags': tags.join(','),
-        'Content-Type': 'text/plain',
+        'Priority': priority,
       },
       body: message,
     });
@@ -64,11 +64,11 @@ export default async function handler(req, res) {
       } else {
         await kv.hset(key, { status: 'delivered', deliveredAt: now });
       }
-      await sendNtfy('Invoice email delivered', `Delivered to ${data?.to || emailId}`, ['email', 'white_check_mark']);
+      await sendNtfy('Invoice Delivered', `Invoice email delivered to ${data?.to || emailId}`, ['white_check_mark', 'envelope'], '3');
     } else if (type === 'email.opened') {
       // Always upgrade to "opened" — highest status
       await kv.hset(key, { status: 'opened', openedAt: now });
-      await sendNtfy('Invoice email opened', `Opened by ${data?.to || emailId}`, ['eyes', 'envelope']);
+      await sendNtfy('Invoice Opened', `Invoice email opened by ${data?.to || emailId}`, ['eyes'], '4');
     } else if (type === 'email.bounced' || type === 'email.complained') {
       await kv.hset(key, { status: 'failed', failedAt: now });
     }
