@@ -5,12 +5,16 @@ const kv = createClient({
   token: process.env.invoicesSimple_KV_REST_API_TOKEN,
 });
 
-// Send a push notification via ntfy.sh — silently skipped if NTFY_TOPIC is not set
+// Send a push notification via ntfy.sh — skipped if NTFY_TOPIC is not set
 async function sendNtfy(title, message, tags = []) {
   const topic = process.env.NTFY_TOPIC;
-  if (!topic) return;
+  if (!topic) {
+    console.warn('[ntfy] NTFY_TOPIC not set — skipping notification');
+    return;
+  }
+  console.log(`[ntfy] sending "${title}" to topic "${topic}"`);
   try {
-    await fetch(`https://ntfy.sh/${topic}`, {
+    const ntfyRes = await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
         'Title': title,
@@ -19,8 +23,13 @@ async function sendNtfy(title, message, tags = []) {
       },
       body: message,
     });
+    if (!ntfyRes.ok) {
+      console.error(`[ntfy] non-OK response: ${ntfyRes.status} ${ntfyRes.statusText}`);
+    } else {
+      console.log(`[ntfy] delivered — status ${ntfyRes.status}`);
+    }
   } catch (err) {
-    console.error('ntfy notification failed:', err.message);
+    console.error('[ntfy] fetch failed:', err.message);
   }
 }
 
