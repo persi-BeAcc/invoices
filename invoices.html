@@ -10,8 +10,8 @@
 <title>Invoices</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#F5F2EC;overflow-x:hidden}
-body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+html,body{height:100%;background:#F5F2EC;overflow-x:hidden;overscroll-behavior:none}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);-webkit-overflow-scrolling:touch}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
 @keyframes slideInFromRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @keyframes slideInFromLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}
@@ -1907,7 +1907,7 @@ function App() {
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       key: screen,
-      style: { willChange: "transform", animation: (slideDir === 'right' ? 'slideInFromRight' : 'slideInFromLeft') + " 300ms ease-out" }
+      style: { animation: (slideDir === 'right' ? 'slideInFromRight' : 'slideInFromLeft') + " 300ms ease-out" }
     }, currentScreen),
     /*#__PURE__*/React.createElement(ToastContainer, null));
 }
@@ -2404,9 +2404,8 @@ function InvoiceList(_ref5) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: headerScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
-      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
-      backdropFilter: headerScrolled ? "blur(8px)" : "none"
+      boxShadow: headerScrolled ? "0 1px 4px rgba(0,0,0,.18)" : "none",
+      transition: "box-shadow 0.2s"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2468,7 +2467,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.13.9")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.1")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2646,7 +2645,7 @@ function InvoiceList(_ref5) {
     }
   }, invoices.length === 0 ? "Tap + to create your first one" : "Tap the card again to show all")) : /*#__PURE__*/React.createElement("div", {
     style: {
-      paddingBottom: 90
+      paddingBottom: "calc(90px + env(safe-area-inset-bottom))"
     }
   }, years.map(function (yr) {
     var list = grouped[yr];
@@ -2678,7 +2677,7 @@ function InvoiceList(_ref5) {
     onClick: onNew,
     style: {
       position: "fixed",
-      bottom: 24,
+      bottom: "calc(24px + env(safe-area-inset-bottom))",
       right: 20,
       width: 54,
       height: 54,
