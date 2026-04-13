@@ -5,6 +5,25 @@ const kv = createClient({
   token: process.env.invoicesSimple_KV_REST_API_TOKEN,
 });
 
+// Send a push notification via ntfy.sh — silently skipped if NTFY_TOPIC is not set
+async function sendNtfy(title, message, tags = []) {
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic) return;
+  try {
+    await fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      headers: {
+        'Title': title,
+        'Tags': tags.join(','),
+        'Content-Type': 'text/plain',
+      },
+      body: message,
+    });
+  } catch (err) {
+    console.error('ntfy notification failed:', err.message);
+  }
+}
+
 // CORS helper
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,9 +55,11 @@ export default async function handler(req, res) {
       } else {
         await kv.hset(key, { status: 'delivered', deliveredAt: now });
       }
+      await sendNtfy('Invoice email delivered', `Delivered to ${data?.to || emailId}`, ['email', 'white_check_mark']);
     } else if (type === 'email.opened') {
       // Always upgrade to "opened" — highest status
       await kv.hset(key, { status: 'opened', openedAt: now });
+      await sendNtfy('Invoice email opened', `Opened by ${data?.to || emailId}`, ['eyes', 'envelope']);
     } else if (type === 'email.bounced' || type === 'email.complained') {
       await kv.hset(key, { status: 'failed', failedAt: now });
     }
