@@ -1,4 +1,9 @@
-import { kv } from '@vercel/kv';
+import { createClient } from '@vercel/kv';
+
+const kv = createClient({
+  url: process.env.invoicesSimple_KV_REST_API_URL,
+  token: process.env.invoicesSimple_KV_REST_API_TOKEN,
+});
 
 // CORS helper
 function cors(res) {
