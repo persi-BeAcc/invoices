@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#1B2B4B"/>
+
+  <!-- Main document body -->
+  <path d="M 140 80 L 312 80 L 372 140 L 372 432 Q 372 448 356 448 L 140 448 Q 124 448 124 432 L 124 96 Q 124 80 140 80 Z" fill="#F5F0E8"/>
+
+  <!-- Folded corner flap -->
+  <path d="M 312 80 L 372 140 L 312 140 Z" fill="#D0CAC0"/>
+
+  <!-- Corner fold shadow line -->
+  <line x1="312" y1="80" x2="312" y2="140" stroke="#B0A898" stroke-width="2"/>
+  <line x1="312" y1="140" x2="372" y2="140" stroke="#B0A898" stroke-width="2"/>
+
+  <!-- Green accent stripe at top of document content area -->
+  <rect x="124" y="172" width="248" height="28" rx="0" fill="#2A7D4F"/>
+
+  <!-- White text placeholder in green bar -->
+  <rect x="148" y="182" width="80" height="8" rx="4" fill="#F5F0E8" opacity="0.8"/>
+
+  <!-- Content lines -->
+  <rect x="148" y="220" width="120" height="10" rx="5" fill="#CCC7BE"/>
+  <rect x="148" y="242" width="176" height="8" rx="4" fill="#D9D4CC"/>
+  <rect x="148" y="260" width="152" height="8" rx="4" fill="#D9D4CC"/>
+
+  <!-- Divider -->
+  <rect x="148" y="284" width="200" height="2" rx="1" fill="#D9D4CC"/>
+
+  <!-- Amount block -->
+  <rect x="148" y="298" width="60" height="11" rx="5.5" fill="#CCC7BE"/>
+  <rect x="264" y="296" width="84" height="15" rx="7.5" fill="#2A7D4F"/>
+
+  <!-- Bottom lines -->
+  <rect x="148" y="330" width="140" height="8" rx="4" fill="#E2DDD6"/>
+  <rect x="148" y="348" width="104" height="8" rx="4" fill="#E2DDD6"/>
+
+  <!-- Document lines on the right (decorative) -->
+  <rect x="148" y="376" width="200" height="2" rx="1" fill="#E2DDD6"/>
+  <rect x="148" y="392" width="160" height="2" rx="1" fill="#E2DDD6"/>
+  <rect x="148" y="408" width="120" height="2" rx="1" fill="#E2DDD6"/>
+</svg>

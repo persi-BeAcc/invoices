@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Invoices">
 <meta name="theme-color" content="#1B2B4B">
+<link rel="manifest" href="/invoices/manifest.json">
+<link rel="apple-touch-icon" href="/invoices/icon-192.png">
 <title>Invoices</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2467,7 +2469,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.14.1")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.2")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -5015,6 +5017,25 @@ function ClientsScreen(_ref13) {
   }))));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/invoices/sw.js').then(function(reg) {
+      reg.addEventListener('updatefound', function() {
+        var newSW = reg.installing;
+        newSW.addEventListener('statechange', function() {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // A new version is ready — show a toast if the app's toast system is available
+            if (typeof showToast === 'function') {
+              showToast('Update available — reload to get the latest version.', 'info');
+            }
+          }
+        });
+      });
+    });
+  });
+}
 </script>
 </body>
 </html>

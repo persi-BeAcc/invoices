@@ -1,0 +1,25 @@
+{
+  "name": "Invoices",
+  "short_name": "Invoices",
+  "description": "Manage and send invoices to clients",
+  "start_url": "/invoices/invoices.html",
+  "scope": "/invoices/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1B2B4B",
+  "theme_color": "#1B2B4B",
+  "icons": [
+    {
+      "src": "/invoices/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/invoices/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

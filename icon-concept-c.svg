@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#1B2B4B"/>
+
+  <!-- Receipt shape with torn bottom edge -->
+  <rect x="128" y="72" width="256" height="304" rx="12" ry="12" fill="#F5F0E8"/>
+
+  <!-- Perforated tear line at bottom of receipt -->
+  <rect x="128" y="356" width="256" height="20" rx="0" fill="#F5F0E8"/>
+  <circle cx="156" cy="376" r="10" fill="#1B2B4B"/>
+  <circle cx="196" cy="376" r="10" fill="#1B2B4B"/>
+  <circle cx="236" cy="376" r="10" fill="#1B2B4B"/>
+  <circle cx="276" cy="376" r="10" fill="#1B2B4B"/>
+  <circle cx="316" cy="376" r="10" fill="#1B2B4B"/>
+  <circle cx="356" cy="376" r="10" fill="#1B2B4B"/>
+
+  <!-- Receipt content lines -->
+  <rect x="156" y="106" width="88" height="12" rx="6" fill="#B0A898"/>
+  <rect x="156" y="132" width="144" height="9" rx="4.5" fill="#CCC7BE"/>
+  <rect x="156" y="150" width="120" height="9" rx="4.5" fill="#CCC7BE"/>
+
+  <!-- Divider -->
+  <rect x="156" y="172" width="200" height="1.5" rx="0.75" fill="#D9D4CC"/>
+
+  <!-- Line items -->
+  <rect x="156" y="184" width="88" height="8" rx="4" fill="#CCC7BE"/>
+  <rect x="296" y="184" width="60" height="8" rx="4" fill="#CCC7BE"/>
+  <rect x="156" y="202" width="72" height="8" rx="4" fill="#CCC7BE"/>
+  <rect x="296" y="202" width="60" height="8" rx="4" fill="#CCC7BE"/>
+  <rect x="156" y="220" width="96" height="8" rx="4" fill="#CCC7BE"/>
+  <rect x="296" y="220" width="60" height="8" rx="4" fill="#CCC7BE"/>
+
+  <!-- Total row -->
+  <rect x="156" y="244" width="200" height="1.5" rx="0.75" fill="#D9D4CC"/>
+  <rect x="156" y="256" width="44" height="12" rx="6" fill="#B0A898"/>
+  <rect x="276" y="256" width="80" height="12" rx="6" fill="#2A7D4F"/>
+
+  <!-- Checkmark circle overlaid at bottom -->
+  <circle cx="256" cy="430" r="52" fill="#2A7D4F"/>
+  <circle cx="256" cy="430" r="44" fill="#2A7D4F"/>
+  <!-- Checkmark path -->
+  <polyline points="228,430 248,450 288,408" fill="none" stroke="#F5F0E8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
