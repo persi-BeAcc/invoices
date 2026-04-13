@@ -10,9 +10,16 @@
 <title>Invoices</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#F5F2EC}
-body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+html,body{height:100%;background:#F5F2EC;overflow-x:hidden}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
+@keyframes slideInFromRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes slideInFromLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fadeInBg{from{opacity:0}to{opacity:1}}
+@keyframes toastIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.skel-line{background:linear-gradient(90deg,#E2DDD6 25%,#EDE9E2 50%,#E2DDD6 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
 </style>
 </head>
 <body>
@@ -1482,6 +1489,46 @@ var T = {
   textDark: "#1a1a2e",
   card: "#fff"
 };
+
+/* ─── Haptic ──────────────────────────────────────────────────────── */
+var haptic = function haptic() {
+  try { if (navigator.vibrate) navigator.vibrate(10); } catch (_) {}
+};
+
+/* ─── Toast System ────────────────────────────────────────────────── */
+var _toastListeners = [];
+var showToast = function showToast(msg, type) {
+  _toastListeners.forEach(function (fn) { fn(msg, type || 'info'); });
+};
+var ToastContainer = function ToastContainer() {
+  var _useState_tc1 = useState([]),
+    _useState_tc2 = _slicedToArray(_useState_tc1, 2),
+    toasts = _useState_tc2[0],
+    setToasts = _useState_tc2[1];
+  useEffect(function () {
+    var handler = function handler(msg, type) {
+      var id = Date.now() + Math.random();
+      setToasts(function (prev) { return prev.concat([{ id: id, msg: msg, type: type }]); });
+      setTimeout(function () {
+        setToasts(function (prev) { return prev.filter(function (t) { return t.id !== id; }); });
+      }, 3500);
+    };
+    _toastListeners.push(handler);
+    return function () {
+      _toastListeners = _toastListeners.filter(function (fn) { return fn !== handler; });
+    };
+  }, []);
+  if (toasts.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", bottom: 90, left: 0, right: 0, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, padding: "0 16px", pointerEvents: "none" }
+  }, toasts.map(function (t) {
+    var bg = t.type === 'error' ? '#C43636' : t.type === 'success' ? '#1A7A4A' : T.navy;
+    return /*#__PURE__*/React.createElement("div", {
+      key: t.id,
+      style: { background: bg, color: "#fff", padding: "12px 16px", borderRadius: 10, fontSize: 14, fontWeight: 500, boxShadow: "0 4px 16px rgba(0,0,0,.25)", animation: "toastIn 250ms ease-out" }
+    }, t.msg);
+  }));
+};
 var inp = function inp() {
   var x = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return _objectSpread({
@@ -1608,10 +1655,10 @@ function App() {
     _useState16 = _slicedToArray(_useState15, 2),
     loading = _useState16[0],
     setLoading = _useState16[1];
-  var _useStateT1 = useState(null),
-    _useStateT2 = _slicedToArray(_useStateT1, 2),
-    toast = _useStateT2[0],
-    setToast = _useStateT2[1];
+  var _useState_sd = useState('right'),
+    _useState_sd2 = _slicedToArray(_useState_sd, 2),
+    slideDir = _useState_sd2[0],
+    setSlideDir = _useState_sd2[1];
   useEffect(function () {
     Promise.all([sGet("inv_list"), sGet("inv_settings"), sGet("inv_catalog"), sGet("inv_clients")]).then(function (_ref3) {
       var _ref4 = _slicedToArray(_ref3, 4),
@@ -1632,6 +1679,7 @@ function App() {
     };
     document.head.appendChild(s);
   }, []);
+  useEffect(function () { window.scrollTo(0, 0); }, [screen]);
   var saveInvoices = function saveInvoices(list) {
     setInvoices(list);
     sSet("inv_list", list);
@@ -1654,11 +1702,11 @@ function App() {
     });
     var n = nums.length ? Math.max.apply(Math, _toConsumableArray(nums)) + 1 : 1;
     setEditing(mkInvoice("INV".concat(String(n).padStart(4, "0"))));
-    setScreen("form");
+    setSlideDir('right'); setScreen("form");
   };
   var openEdit = function openEdit(inv) {
     setEditing(JSON.parse(JSON.stringify(inv)));
-    setScreen("form");
+    setSlideDir('right'); setScreen("form");
   };
   var saveInvoice = function saveInvoice(inv) {
     var idx = invoices.findIndex(function (i) {
@@ -1667,7 +1715,7 @@ function App() {
     saveInvoices(idx >= 0 ? invoices.map(function (i) {
       return i.id === inv.id ? inv : i;
     }) : [inv].concat(_toConsumableArray(invoices)));
-    setScreen("list");
+    setSlideDir('left'); setScreen("list");
   };
   var updateInvoice = function updateInvoice(inv) {
     var idx = invoices.findIndex(function (i) {
@@ -1681,19 +1729,12 @@ function App() {
     saveInvoices(invoices.filter(function (i) {
       return i.id !== id;
     }));
-    setScreen("list");
-  };
-  var showToast = function showToast(msg) {
-    setToast(msg);
-    setTimeout(function () {
-      setToast(null);
-    }, 3500);
+    setSlideDir('left'); setScreen("list");
   };
   var onEmailSentNav = function onEmailSentNav(updatedInv) {
     updateInvoice(updatedInv);
-    showToast("\u2713 Email sent for " + (updatedInv.number || "invoice"));
-    setScreen("list");
-    window.scrollTo(0, 0);
+    showToast("\u2713 Email sent for " + (updatedInv.number || "invoice"), "success");
+    setSlideDir('left'); setScreen("list");
   };
   var handleImport = function handleImport(invs, detectedName) {
     var mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "add";
@@ -1787,19 +1828,26 @@ function App() {
       };
     }
   };
-  if (loading) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      height: "100vh",
-      background: T.bg,
-      fontFamily: "serif",
-      color: T.navy,
-      fontSize: 15
-    }
-  }, "Loading\u2026");
-  if (screen === "form") return /*#__PURE__*/React.createElement(InvoiceForm, {
+  if (loading) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: { minHeight: "100vh", background: T.bg, fontFamily: "'DM Sans',system-ui,sans-serif" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { background: T.navy, padding: "14px 16px" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", justifyContent: "space-between" }
+  }, /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: 60, height: 18 } }),
+    /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: 80, height: 20, opacity: 0.4 } }),
+    /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: 28, height: 18, opacity: 0.4 } }))),
+    /*#__PURE__*/React.createElement("div", { style: { padding: "12px 12px 0" } },
+      [80, 60, 90, 50, 70, 65].map(function (w, i) {
+        return /*#__PURE__*/React.createElement("div", { key: i, style: { background: "#fff", borderRadius: 8, padding: "13px 14px", marginBottom: 1, borderLeft: "3px solid #E2DDD6" } },
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 8 } },
+            /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: w + "%", height: 14 } }),
+            /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: 52, height: 14 } })),
+          /*#__PURE__*/React.createElement("div", { className: "skel-line", style: { width: "45%", height: 11, marginTop: 4 } }));
+      }))), /*#__PURE__*/React.createElement(ToastContainer, null));
+
+  var currentScreen;
+  if (screen === "form") currentScreen = /*#__PURE__*/React.createElement(InvoiceForm, {
     invoice: editing,
     settings: settings,
     catalog: catalog,
@@ -1811,70 +1859,57 @@ function App() {
     onDelete: deleteInvoice,
     onEmailSentBack: onEmailSentNav,
     onBack: function onBack() {
-      return setScreen("list");
+      setSlideDir('left'); setScreen("list");
     }
   });
-  if (screen === "settings") return /*#__PURE__*/React.createElement(SettingsScreen, {
+  else if (screen === "settings") currentScreen = /*#__PURE__*/React.createElement(SettingsScreen, {
     settings: settings,
     onSave: saveSettings,
     onBack: function onBack() {
-      return setScreen("list");
+      setSlideDir('left'); setScreen("list");
     }
   });
-  if (screen === "catalog") return /*#__PURE__*/React.createElement(CatalogScreen, {
+  else if (screen === "catalog") currentScreen = /*#__PURE__*/React.createElement(CatalogScreen, {
     catalog: catalog,
     onSave: saveCatalog,
     onBack: function onBack() {
-      return setScreen("list");
+      setSlideDir('left'); setScreen("list");
     }
   });
-  if (screen === "clients") return /*#__PURE__*/React.createElement(ClientsScreen, {
+  else if (screen === "clients") currentScreen = /*#__PURE__*/React.createElement(ClientsScreen, {
     clients: clients,
     onSave: saveClients,
     onBack: function onBack() {
-      return setScreen("list");
+      setSlideDir('left'); setScreen("list");
     }
   });
-  return /*#__PURE__*/React.createElement(React.Fragment, null, toast && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "fixed",
-      top: 20,
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 9999,
-      background: "#1B2B4B",
-      color: "#fff",
-      padding: "12px 22px",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 600,
-      fontFamily: "'DM Sans',system-ui,sans-serif",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.28)",
-      pointerEvents: "none",
-      whiteSpace: "nowrap",
-      letterSpacing: 0.2
-    }
-  }, toast), /*#__PURE__*/React.createElement(InvoiceList, {
+  else currentScreen = /*#__PURE__*/React.createElement(InvoiceList, {
     invoices: invoices,
     filter: filter,
     onFilter: setFilter,
     onNew: openNew,
     onOpen: openEdit,
     onSettings: function onSettings() {
-      return setScreen("settings");
+      setSlideDir('right'); setScreen("settings");
     },
     onCatalog: function onCatalog() {
-      return setScreen("catalog");
+      setSlideDir('right'); setScreen("catalog");
     },
     onClients: function onClients() {
-      return setScreen("clients");
+      setSlideDir('right'); setScreen("clients");
     },
     onSave: updateInvoice,
     onImport: handleImport,
     onExport: function onExport() {
       return exportXLSX(invoices, settings, clients);
     }
-  }));
+  });
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      key: screen,
+      style: { willChange: "transform", animation: (slideDir === 'right' ? 'slideInFromRight' : 'slideInFromLeft') + " 300ms ease-out" }
+    }, currentScreen),
+    /*#__PURE__*/React.createElement(ToastContainer, null));
 }
 
 /* ─── Mark Paid Modal ────────────────────────────────────────────── */
@@ -1895,6 +1930,20 @@ var MarkPaidModal = function MarkPaidModal(_ref_mp) {
     _useState_mp6 = _slicedToArray(_useState_mp5, 2),
     method = _useState_mp6[0],
     setMethod = _useState_mp6[1];
+  var _useState_sh1 = useState(false),
+    _useState_sh2 = _slicedToArray(_useState_sh1, 2),
+    sheetOpen = _useState_sh2[0],
+    setSheetOpen = _useState_sh2[1];
+  var _useState_sh3 = useState(0),
+    _useState_sh4 = _slicedToArray(_useState_sh3, 2),
+    sheetY = _useState_sh4[0],
+    setSheetY = _useState_sh4[1];
+  var _useState_sh5 = useState(false),
+    _useState_sh6 = _slicedToArray(_useState_sh5, 2),
+    sheetDragging = _useState_sh6[0],
+    setSheetDragging = _useState_sh6[1];
+  var sheetStartY = useRef(0);
+  useEffect(function () { requestAnimationFrame(function () { setSheetOpen(true); }); }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -1902,7 +1951,8 @@ var MarkPaidModal = function MarkPaidModal(_ref_mp) {
       background: "rgba(0,0,0,.45)",
       zIndex: 200,
       display: "flex",
-      alignItems: "flex-end"
+      alignItems: "flex-end",
+      animation: "fadeInBg 300ms ease"
     },
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
@@ -1910,12 +1960,20 @@ var MarkPaidModal = function MarkPaidModal(_ref_mp) {
       background: "#fff",
       borderRadius: "16px 16px 0 0",
       padding: "20px 16px 36px",
-      width: "100%"
+      width: "100%",
+      transform: "translateY(" + (sheetOpen ? sheetY : 100) + (sheetOpen ? "px" : "%") + ")",
+      transition: sheetDragging ? "none" : "transform 0.3s ease-out",
+      willChange: "transform"
     },
+    onTouchStart: function onTouchStart(e) { sheetStartY.current = e.touches[0].clientY; setSheetDragging(true); },
+    onTouchMove: function onTouchMove(e) { var dy = e.touches[0].clientY - sheetStartY.current; if (dy > 0) setSheetY(dy); },
+    onTouchEnd: function onTouchEnd() { setSheetDragging(false); if (sheetY > 80) { haptic(); onClose(); } else setSheetY(0); },
     onClick: function onClick(e) {
       return e.stopPropagation();
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: { width: 36, height: 4, background: "#E0DDD8", borderRadius: 2, margin: "0 auto 16px", flexShrink: 0 }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
       fontSize: 17,
@@ -2100,7 +2158,9 @@ var SwipeRow = function SwipeRow(_ref_sr) {
     onTouchEnd: function onTouchEnd() {
       setSwiping(false);
       setOffset(function (prev) {
-        return prev <= -60 ? -REVEAL : 0;
+        var next = prev <= -60 ? -REVEAL : 0;
+        if (next === -REVEAL) haptic();
+        return next;
       });
     },
     onClick: function onClick() {
@@ -2213,6 +2273,15 @@ function InvoiceList(_ref5) {
     _useState20 = _slicedToArray(_useState19, 2),
     importMsg = _useState20[0],
     setImportMsg = _useState20[1];
+  var _useState_sc1 = useState(false),
+    _useState_sc2 = _slicedToArray(_useState_sc1, 2),
+    headerScrolled = _useState_sc2[0],
+    setHeaderScrolled = _useState_sc2[1];
+  useEffect(function () {
+    var handler = function handler() { setHeaderScrolled(window.scrollY > 4); };
+    window.addEventListener('scroll', handler, { passive: true });
+    return function () { window.removeEventListener('scroll', handler); };
+  }, []);
   var fileRef = useRef();
   var replaceRef = useRef();
 
@@ -2335,7 +2404,9 @@ function InvoiceList(_ref5) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+      boxShadow: headerScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
+      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
+      backdropFilter: headerScrolled ? "blur(8px)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2397,7 +2468,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.13.8")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.13.9")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2659,6 +2730,20 @@ function SendEmailDialog(_ref_sd) {
     _useState_sd0 = _slicedToArray(_useState_sd9, 2),
     msg = _useState_sd0[0],
     setMsg = _useState_sd0[1];
+  var _useState_sds1 = useState(false),
+    _useState_sds2 = _slicedToArray(_useState_sds1, 2),
+    sdSheetOpen = _useState_sds2[0],
+    setSdSheetOpen = _useState_sds2[1];
+  var _useState_sds3 = useState(0),
+    _useState_sds4 = _slicedToArray(_useState_sds3, 2),
+    sdSheetY = _useState_sds4[0],
+    setSdSheetY = _useState_sds4[1];
+  var _useState_sds5 = useState(false),
+    _useState_sds6 = _slicedToArray(_useState_sds5, 2),
+    sdSheetDragging = _useState_sds6[0],
+    setSdSheetDragging = _useState_sds6[1];
+  var sdSheetStartY = useRef(0);
+  useEffect(function () { requestAnimationFrame(function () { setSdSheetOpen(true); }); }, []);
   var doSend = function doSend() {
     if (!to.trim()) {
       setMsg("Please enter a recipient email.");
@@ -2707,6 +2792,7 @@ function SendEmailDialog(_ref_sd) {
         return d;
       });
     }).then(function (data) {
+      haptic();
       onSent({
         emailStatus: "sent",
         emailSentAt: new Date().toISOString(),
@@ -2745,7 +2831,8 @@ function SendEmailDialog(_ref_sd) {
       background: "rgba(0,0,0,.55)",
       zIndex: 200,
       display: "flex",
-      alignItems: "flex-end"
+      alignItems: "flex-end",
+      animation: "fadeInBg 300ms ease"
     },
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
@@ -2756,12 +2843,20 @@ function SendEmailDialog(_ref_sd) {
       width: "100%",
       boxSizing: "border-box",
       maxHeight: "92vh",
-      overflowY: "auto"
+      overflowY: "auto",
+      transform: "translateY(" + (sdSheetOpen ? sdSheetY : 100) + (sdSheetOpen ? "px" : "%") + ")",
+      transition: sdSheetDragging ? "none" : "transform 0.3s ease-out",
+      willChange: "transform"
     },
+    onTouchStart: function onTouchStart(e) { sdSheetStartY.current = e.touches[0].clientY; setSdSheetDragging(true); },
+    onTouchMove: function onTouchMove(e) { var dy = e.touches[0].clientY - sdSheetStartY.current; if (dy > 0) setSdSheetY(dy); },
+    onTouchEnd: function onTouchEnd() { setSdSheetDragging(false); if (sdSheetY > 80) { haptic(); onClose(); } else setSdSheetY(0); },
     onClick: function onClick(e) {
       return e.stopPropagation();
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: { width: 36, height: 4, background: "#E0DDD8", borderRadius: 2, margin: "0 auto 16px", flexShrink: 0 }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -2916,6 +3011,33 @@ function InvoiceForm(_ref7) {
     _useState32 = _slicedToArray(_useState31, 2),
     sendOpen = _useState32[0],
     setSendOpen = _useState32[1];
+  var _useState_catSY1 = useState(0),
+    _useState_catSY2 = _slicedToArray(_useState_catSY1, 2),
+    catSheetY = _useState_catSY2[0],
+    setCatSheetY = _useState_catSY2[1];
+  var _useState_catSD1 = useState(false),
+    _useState_catSD2 = _slicedToArray(_useState_catSD1, 2),
+    catSheetDragging = _useState_catSD2[0],
+    setCatSheetDragging = _useState_catSD2[1];
+  var catSheetStartY = useRef(0);
+  var _useState_clSY1 = useState(0),
+    _useState_clSY2 = _slicedToArray(_useState_clSY1, 2),
+    clSheetY = _useState_clSY2[0],
+    setClSheetY = _useState_clSY2[1];
+  var _useState_clSD1 = useState(false),
+    _useState_clSD2 = _slicedToArray(_useState_clSD1, 2),
+    clSheetDragging = _useState_clSD2[0],
+    setClSheetDragging = _useState_clSD2[1];
+  var clSheetStartY = useRef(0);
+  var _useState_fsc1 = useState(false),
+    _useState_fsc2 = _slicedToArray(_useState_fsc1, 2),
+    formHeaderScrolled = _useState_fsc2[0],
+    setFormHeaderScrolled = _useState_fsc2[1];
+  useEffect(function () {
+    var handler = function handler() { setFormHeaderScrolled(window.scrollY > 4); };
+    window.addEventListener('scroll', handler, { passive: true });
+    return function () { window.removeEventListener('scroll', handler); };
+  }, []);
   var totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
@@ -2980,7 +3102,7 @@ function InvoiceForm(_ref7) {
               _context.n = 1;
               break;
             }
-            alert("PDF engine loading, try again in a moment.");
+            showToast("PDF engine loading, try again in a moment.", "error");
             return _context.a(2);
           case 1:
             setSharing(true);
@@ -3019,7 +3141,7 @@ function InvoiceForm(_ref7) {
           case 6:
             _context.p = 6;
             _t = _context.v;
-            if (_t.name !== "AbortError") alert("Could not share: " + _t.message);
+            if (_t.name !== "AbortError") showToast("Could not share: " + _t.message, "error");
           case 7:
             setSharing(false);
           case 8:
@@ -3033,7 +3155,7 @@ function InvoiceForm(_ref7) {
   }();
   var doDownload = function doDownload() {
     if (!pdfReady) {
-      alert("PDF engine loading, try again.");
+      showToast("PDF engine loading, try again.", "error");
       return;
     }
     buildPDF(inv, settings).save("".concat(inv.number, ".pdf"));
@@ -3066,7 +3188,9 @@ function InvoiceForm(_ref7) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+      boxShadow: formHeaderScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
+      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
+      backdropFilter: formHeaderScrolled ? "blur(8px)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3732,7 +3856,7 @@ function InvoiceForm(_ref7) {
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      return onDelete(inv.id);
+      haptic(); onDelete(inv.id);
     },
     style: {
       padding: "8px 20px",
@@ -3763,7 +3887,8 @@ function InvoiceForm(_ref7) {
       background: "rgba(0,0,0,.5)",
       zIndex: 100,
       display: "flex",
-      alignItems: "flex-end"
+      alignItems: "flex-end",
+      animation: "fadeInBg 300ms ease"
     },
     onClick: function onClick() {
       return setClientOpen(false);
@@ -3775,12 +3900,21 @@ function InvoiceForm(_ref7) {
       width: "100%",
       maxHeight: "65vh",
       overflow: "auto",
-      padding: 16
+      padding: 16,
+      animation: "sheetUp 300ms ease-out",
+      transform: clSheetY > 0 ? "translateY(" + clSheetY + "px)" : undefined,
+      transition: clSheetDragging ? "none" : "transform 0.3s ease",
+      willChange: "transform"
     },
+    onTouchStart: function onTouchStart(e) { clSheetStartY.current = e.touches[0].clientY; setClSheetDragging(true); },
+    onTouchMove: function onTouchMove(e) { var dy = e.touches[0].clientY - clSheetStartY.current; if (dy > 0) setClSheetY(dy); },
+    onTouchEnd: function onTouchEnd() { setClSheetDragging(false); if (clSheetY > 80) { haptic(); setClientOpen(false); setClSheetY(0); } else setClSheetY(0); },
     onClick: function onClick(e) {
       return e.stopPropagation();
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: { width: 36, height: 4, background: "#E0DDD8", borderRadius: 2, margin: "0 auto 12px" }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
       fontSize: 16,
@@ -3843,13 +3977,13 @@ function InvoiceForm(_ref7) {
       var _inv$to10, _inv$to11, _inv$to12;
       var name = (_inv$to10 = inv.to) === null || _inv$to10 === void 0 || (_inv$to10 = _inv$to10.name) === null || _inv$to10 === void 0 ? void 0 : _inv$to10.trim();
       if (!name) {
-        alert("Fill in a client name first.");
+        showToast("Fill in a client name first.", "error");
         return;
       }
       if ((clients || []).some(function (c) {
         return c.name.toLowerCase() === name.toLowerCase();
       })) {
-        alert("Client already saved.");
+        showToast("Client already saved.", "error");
         return;
       }
       var next = [].concat(_toConsumableArray(clients || []), [{
@@ -3860,7 +3994,7 @@ function InvoiceForm(_ref7) {
         phone: ""
       }]);
       onSaveClients(next);
-      alert("Client saved!");
+      showToast("Client saved!", "success");
     },
     style: {
       background: "none",
@@ -3879,7 +4013,8 @@ function InvoiceForm(_ref7) {
       background: "rgba(0,0,0,.5)",
       zIndex: 100,
       display: "flex",
-      alignItems: "flex-end"
+      alignItems: "flex-end",
+      animation: "fadeInBg 300ms ease"
     },
     onClick: function onClick() {
       return setCatalogOpen(false);
@@ -3891,12 +4026,21 @@ function InvoiceForm(_ref7) {
       width: "100%",
       maxHeight: "60vh",
       overflow: "auto",
-      padding: 16
+      padding: 16,
+      animation: "sheetUp 300ms ease-out",
+      transform: catSheetY > 0 ? "translateY(" + catSheetY + "px)" : undefined,
+      transition: catSheetDragging ? "none" : "transform 0.3s ease",
+      willChange: "transform"
     },
+    onTouchStart: function onTouchStart(e) { catSheetStartY.current = e.touches[0].clientY; setCatSheetDragging(true); },
+    onTouchMove: function onTouchMove(e) { var dy = e.touches[0].clientY - catSheetStartY.current; if (dy > 0) setCatSheetY(dy); },
+    onTouchEnd: function onTouchEnd() { setCatSheetDragging(false); if (catSheetY > 80) { haptic(); setCatalogOpen(false); setCatSheetY(0); } else setCatSheetY(0); },
     onClick: function onClick(e) {
       return e.stopPropagation();
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: { width: 36, height: 4, background: "#E0DDD8", borderRadius: 2, margin: "0 auto 12px" }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
       fontSize: 16,
@@ -3958,9 +4102,9 @@ function InvoiceForm(_ref7) {
         onSaveCatalog([].concat(_toConsumableArray(catalog), [_objectSpread(_objectSpread({}, last), {}, {
           id: uid()
         })]));
-        alert("Saved to catalog!");
+        showToast("Saved to catalog!", "success");
       } else {
-        alert("Fill in a description first.");
+        showToast("Fill in a description first.", "error");
       }
     },
     style: {
@@ -4000,6 +4144,15 @@ function SettingsScreen(_ref1) {
       return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k, v));
     });
   };
+  var _useState_ssc1 = useState(false),
+    _useState_ssc2 = _slicedToArray(_useState_ssc1, 2),
+    settScrolled = _useState_ssc2[0],
+    setSettScrolled = _useState_ssc2[1];
+  useEffect(function () {
+    var handler = function handler() { setSettScrolled(window.scrollY > 4); };
+    window.addEventListener('scroll', handler, { passive: true });
+    return function () { window.removeEventListener('scroll', handler); };
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -4013,7 +4166,9 @@ function SettingsScreen(_ref1) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+      boxShadow: settScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
+      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
+      backdropFilter: settScrolled ? "blur(8px)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4384,6 +4539,15 @@ function CatalogScreen(_ref12) {
       return i.id !== id;
     }));
   };
+  var _useState_csc1 = useState(false),
+    _useState_csc2 = _slicedToArray(_useState_csc1, 2),
+    catScrolled = _useState_csc2[0],
+    setCatScrolled = _useState_csc2[1];
+  useEffect(function () {
+    var handler = function handler() { setCatScrolled(window.scrollY > 4); };
+    window.addEventListener('scroll', handler, { passive: true });
+    return function () { window.removeEventListener('scroll', handler); };
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -4397,7 +4561,9 @@ function CatalogScreen(_ref12) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+      boxShadow: catScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
+      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
+      backdropFilter: catScrolled ? "blur(8px)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4637,6 +4803,15 @@ function ClientsScreen(_ref13) {
       return i.id !== id;
     }));
   };
+  var _useState_clsc1 = useState(false),
+    _useState_clsc2 = _slicedToArray(_useState_clsc1, 2),
+    clScrolled = _useState_clsc2[0],
+    setClScrolled = _useState_clsc2[1];
+  useEffect(function () {
+    var handler = function handler() { setClScrolled(window.scrollY > 4); };
+    window.addEventListener('scroll', handler, { passive: true });
+    return function () { window.removeEventListener('scroll', handler); };
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -4650,7 +4825,9 @@ function ClientsScreen(_ref13) {
       position: "sticky",
       top: 0,
       zIndex: 20,
-      boxShadow: "0 2px 10px rgba(0,0,0,.2)"
+      boxShadow: clScrolled ? "0 2px 10px rgba(0,0,0,.2)" : "none",
+      transition: "box-shadow 0.2s, backdrop-filter 0.2s",
+      backdropFilter: clScrolled ? "blur(8px)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
