@@ -2361,7 +2361,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.12.17")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.12.18")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2646,6 +2646,7 @@ function SendEmailDialog(_ref_sd) {
     var htmlBody = buildEmailHTML(body, settings);
     fetch(apiUrl + "/api/send-invoice", {
       method: "POST",
+      signal: AbortSignal.timeout(30000),
       headers: {
         "Content-Type": "application/json"
       },
