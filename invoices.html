@@ -853,6 +853,7 @@ var mkInvoice = function mkInvoice(number) {
     paymentMethod: "",
     notes: "",
     paymentTerms: "",
+    paymentLink: "",
     emailStatus: "",
     emailSentAt: "",
     emailOpenedAt: "",
@@ -1067,6 +1068,7 @@ var importXLSX = function importXLSX(data) {
   var iPd = col("amount paid", "paid amount", "paid");
   var iBal = col("balance due", "balance remaining", "balance");
   var iPay = col("payment details", "payment info", "payment");
+  var iPayLink = col("payment link", "pay link", "wise link");
   var iEStatus = col("email status");
   var iESentAt = col("email sent");
   var iEOpenedAt = col("email opened");
@@ -1125,6 +1127,7 @@ var importXLSX = function importXLSX(data) {
       paymentMethod: paymentMethod,
       notes: "",
       paymentTerms: "",
+      paymentLink: String(get(r, iPayLink) || "").trim(),
       emailStatus: String(get(r, iEStatus) || "").trim(),
       emailSentAt: String(get(r, iESentAt) || "").trim(),
       emailOpenedAt: String(get(r, iEOpenedAt) || "").trim(),
@@ -1168,13 +1171,13 @@ var exportXLSX = function exportXLSX(invoices, settings, clients) {
   var clWs = XLSX.utils.aoa_to_sheet(clRows);
 
   // ── Invoices sheet ────────────────────────────────────────────
-  var invRows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", "Email Status", "Email Sent", "Email Opened", "Email Recipient", "Email Message ID"]];
+  var invRows = [[settings.name || "My Business"], [], ["Invoice #", "Date", "Due Date", "Client", "Status", "Total", "Balance Due", "Notes", "Payment Link", "Email Status", "Email Sent", "Email Opened", "Email Recipient", "Email Message ID"]];
   invoices.forEach(function (inv) {
     var _inv$to;
     var _calc = calc(inv),
       total = _calc.total,
       balance = _calc.balance;
-    invRows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", inv.emailStatus || "", inv.emailSentAt || "", inv.emailOpenedAt || "", inv.emailRecipient || "", inv.emailMessageId || ""]);
+    invRows.push([inv.number, inv.date, inv.dueDate || "", ((_inv$to = inv.to) === null || _inv$to === void 0 ? void 0 : _inv$to.name) || "", inv.status, "".concat(sym).concat(total.toFixed(2)), "".concat(sym).concat(balance.toFixed(2)), inv.notes || "", inv.paymentLink || "", inv.emailStatus || "", inv.emailSentAt || "", inv.emailOpenedAt || "", inv.emailRecipient || "", inv.emailMessageId || ""]);
   });
   var invWs = XLSX.utils.aoa_to_sheet(invRows);
 
@@ -1471,6 +1474,24 @@ var buildPDF = function buildPDF(inv, settings) {
     c.apply(void 0, _toConsumableArray(C.mid));
     var _ls2 = doc.splitTextToSize(inv.notes, W - M * 2);
     doc.text(_ls2, M, y);
+    y += _ls2.length * 4.2 + 4;
+  }
+
+  // ── PAYMENT LINK ─────────────────────────────────────────────────
+  if (inv.paymentLink) {
+    var linkLabel = "Pay online: ";
+    f("normal", 8.5);
+    c.apply(void 0, _toConsumableArray(C.mid));
+    var labelW = doc.getTextWidth(linkLabel);
+    doc.text(linkLabel, M, y);
+    doc.setTextColor(37, 99, 235); // blue
+    doc.setFont("helvetica", "normal");
+    doc.textWithLink(inv.paymentLink, M + labelW, y, { url: inv.paymentLink });
+    // underline
+    var linkW = doc.getTextWidth(inv.paymentLink);
+    doc.setDrawColor(37, 99, 235);
+    doc.setLineWidth(0.3);
+    doc.line(M + labelW, y + 0.6, M + labelW + linkW, y + 0.6);
   }
   return doc;
 };
@@ -2471,7 +2492,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.14.4")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.5")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2714,7 +2735,7 @@ function SendEmailDialog(_ref_sd) {
   var _totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
-  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + sym + _totals.total.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\nPlease do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
+  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + sym + _totals.total.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\n" + (inv.paymentLink ? "Pay this invoice: " + inv.paymentLink + "\n\n" : "") + "Please do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
   var _useState_sd1 = useState((inv.to && inv.to.email) || ""),
     _useState_sd2 = _slicedToArray(_useState_sd1, 2),
     to = _useState_sd2[0],
@@ -3725,6 +3746,16 @@ function InvoiceForm(_ref7) {
       return set("paymentTerms", e.target.value);
     },
     placeholder: "Payment due within 30 days."
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Payment Link"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: inp(),
+    type: "url",
+    value: inv.paymentLink || "",
+    onChange: function onChange(e) {
+      return set("paymentLink", e.target.value);
+    },
+    placeholder: "https://wise.com/pay/..."
   })))), inv.emailStatus ? /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "0 12px 8px",
