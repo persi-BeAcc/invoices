@@ -1479,7 +1479,7 @@ var buildPDF = function buildPDF(inv, settings) {
 
   // ── PAYMENT LINK ─────────────────────────────────────────────────
   if (inv.paymentLink) {
-    var linkLabel = "Pay online: ";
+    var linkLabel = "If you wish to pay this invoice online, you may use this link: ";
     f("normal", 8.5);
     c.apply(void 0, _toConsumableArray(C.mid));
     var labelW = doc.getTextWidth(linkLabel);
@@ -2492,7 +2492,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.04.14.5")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.04.14.6")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -2735,7 +2735,7 @@ function SendEmailDialog(_ref_sd) {
   var _totals = calc(inv);
   var sym = settings.currency || "$";
   var code = settings.currencyCode || "USD";
-  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + sym + _totals.total.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\n" + (inv.paymentLink ? "Pay this invoice: " + inv.paymentLink + "\n\n" : "") + "Please do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
+  var defaultBody = "Dear " + ((inv.to && inv.to.name) ? inv.to.name : "there") + ",\n\nPlease find attached invoice " + (inv.number || "") + " for " + sym + _totals.total.toFixed(2) + (inv.dueDate ? ". Payment is due by " + fmtDate(inv.dueDate) : "") + ".\n\n" + (inv.paymentLink ? "If you wish to pay this invoice online, you may use this link: " + inv.paymentLink + "\n\n" : "") + "Please do not hesitate to contact me if you have any questions.\n\nBest regards,\n" + (settings.name || "");
   var _useState_sd1 = useState((inv.to && inv.to.email) || ""),
     _useState_sd2 = _slicedToArray(_useState_sd1, 2),
     to = _useState_sd2[0],
