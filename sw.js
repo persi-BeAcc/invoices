@@ -1,4 +1,4 @@
-const CACHE_NAME = 'invoices-v2026.05.01.3';
+const CACHE_NAME = 'invoices-v2026.05.01.4';
 const ASSETS_TO_PRECACHE = [
   '/invoices/invoices.html',
   '/invoices/manifest.json',
