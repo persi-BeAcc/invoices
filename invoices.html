@@ -2769,6 +2769,54 @@ function SendEmailDialog(_ref_sd) {
     sdSheetDragging = _useState_sds6[0],
     setSdSheetDragging = _useState_sds6[1];
   var sdSheetStartY = useRef(0);
+  var _useState_sda1 = useState([]),
+    _useState_sda2 = _slicedToArray(_useState_sda1, 2),
+    extras = _useState_sda2[0],
+    setExtras = _useState_sda2[1];
+  var fileInputRef = useRef(null);
+  var MAX_TOTAL_BYTES = 3.5 * 1024 * 1024;
+  var MAX_FILE_BYTES = 3 * 1024 * 1024;
+  var fmtBytes = function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(2) + " MB";
+  };
+  var readAsBase64 = function readAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () {
+        var s = String(r.result || "");
+        var i = s.indexOf(",");
+        resolve(i >= 0 ? s.slice(i + 1) : s);
+      };
+      r.onerror = function () { reject(r.error || new Error("read failed")); };
+      r.readAsDataURL(file);
+    });
+  };
+  var addFiles = function addFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+    var arr = Array.from(fileList);
+    setMsg("");
+    var existing = extras.reduce(function (s, f) { return s + f.size; }, 0);
+    var rejected = [];
+    var ps = [];
+    arr.forEach(function (f) {
+      if (f.size > MAX_FILE_BYTES) { rejected.push(f.name + " (>3 MB)"); return; }
+      if (existing + f.size > MAX_TOTAL_BYTES) { rejected.push(f.name + " (would exceed 3.5 MB total)"); return; }
+      existing += f.size;
+      ps.push(readAsBase64(f).then(function (b64) {
+        return { name: f.name, type: f.type || "application/octet-stream", size: f.size, base64: b64 };
+      }));
+    });
+    Promise.all(ps).then(function (added) {
+      if (added.length) setExtras(function (prev) { return prev.concat(added); });
+      if (rejected.length) setMsg("Skipped: " + rejected.join(", "));
+    }).catch(function (e) { setMsg("Could not read file: " + e.message); });
+  };
+  var removeExtra = function removeExtra(idx) {
+    setExtras(function (prev) { return prev.filter(function (_, i) { return i !== idx; }); });
+  };
+  var totalExtraBytes = extras.reduce(function (s, f) { return s + f.size; }, 0);
   useEffect(function () { requestAnimationFrame(function () { setSdSheetOpen(true); }); }, []);
   var doSend = function doSend() {
     if (!to.trim()) {
@@ -2810,7 +2858,8 @@ function SendEmailDialog(_ref_sd) {
         invoiceNumber: inv.number,
         pdfBase64: pdfBase64,
         pdfFilename: (inv.number || "invoice") + ".pdf",
-        fromName: settings.name || ""
+        fromName: settings.name || "",
+        extraAttachments: extras.map(function (f) { return { filename: f.name, content: f.base64 }; })
       })
     }).then(function (r) {
       return r.json().then(function (d) {
@@ -2964,7 +3013,56 @@ function SendEmailDialog(_ref_sd) {
       color: "#888",
       marginBottom: 14
     }
-  }, "Invoice PDF will be attached automatically."), msg ? /*#__PURE__*/React.createElement("div", {
+  }, "Invoice PDF will be attached automatically. Add more files below if you want."), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    multiple: true,
+    ref: fileInputRef,
+    style: { display: "none" },
+    onChange: function onChange(e) { addFiles(e.target.files); e.target.value = ""; }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: function onClick() { if (fileInputRef.current) fileInputRef.current.click(); },
+    style: {
+      width: "100%",
+      padding: "10px 12px",
+      background: "#F3F4F6",
+      border: "1.5px dashed #BBB",
+      borderRadius: 8,
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#444",
+      cursor: "pointer"
+    }
+  }, extras.length ? "+ Add another file" : "+ Attach files (optional)"), extras.length ? /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }
+  }, extras.map(function (f, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "8px 10px",
+        background: "#F9F8F4",
+        border: "1px solid #E2DDD6",
+        borderRadius: 8,
+        fontSize: 13
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: 8, flex: 1, minWidth: 0 }
+    }, "\uD83D\uDCCE ", f.name, /*#__PURE__*/React.createElement("span", {
+      style: { color: "#888", marginLeft: 6 }
+    }, "(", fmtBytes(f.size), ")")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: function onClick() { removeExtra(i); },
+      style: { background: "none", border: "none", color: "#999", fontSize: 18, cursor: "pointer", padding: "0 4px", lineHeight: 1 },
+      "aria-label": "Remove"
+    }, "\u00d7"));
+  })) : null, extras.length ? /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 6, fontSize: 11, color: "#888", textAlign: "right" }
+  }, "Total: ", fmtBytes(totalExtraBytes), " / 3.5 MB") : null), msg ? /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 12px",
       background: "#FEF2F2",

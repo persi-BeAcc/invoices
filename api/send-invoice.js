@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { to, subject, html, invoiceNumber, pdfBase64, pdfFilename, fromName } = req.body;
+  const { to, subject, html, invoiceNumber, pdfBase64, pdfFilename, fromName, extraAttachments } = req.body;
 
   if (!to || !subject || !html) {
     return res.status(400).json({ error: 'Missing required fields: to, subject, html' });
@@ -26,9 +26,22 @@ export default async function handler(req, res) {
   const from = `${fromName || 'My Business'} <${senderEmail}>`;
 
   try {
-    const attachments = pdfBase64
-      ? [{ filename: pdfFilename || `${invoiceNumber || 'invoice'}.pdf`, content: pdfBase64 }]
-      : [];
+    const attachments = [];
+    if (pdfBase64) {
+      attachments.push({
+        filename: pdfFilename || `${invoiceNumber || 'invoice'}.pdf`,
+        content: pdfBase64,
+      });
+    }
+    if (Array.isArray(extraAttachments)) {
+      for (const att of extraAttachments) {
+        if (!att || typeof att !== 'object') continue;
+        const filename = typeof att.filename === 'string' ? att.filename.slice(0, 200) : null;
+        const content  = typeof att.content  === 'string' ? att.content : null;
+        if (!filename || !content) continue;
+        attachments.push({ filename, content });
+      }
+    }
 
     const { data, error } = await resend.emails.send({
       from,
