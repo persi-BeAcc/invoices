@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Invoices">
@@ -12,7 +12,7 @@
 <title>Invoices</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#F5F2EC;overflow-x:hidden;overscroll-behavior:none}#root{min-height:100%;display:flex;flex-direction:column}
+html,body{height:100%;background:#F5F2EC;overflow-x:hidden;overscroll-behavior:none;touch-action:pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}#root{min-height:100%;display:flex;flex-direction:column}
 body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);-webkit-overflow-scrolling:touch}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}
 @keyframes slideInFromRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
@@ -2492,7 +2492,7 @@ function InvoiceList(_ref5) {
       fontSize: 10,
       letterSpacing: 0.5
     }
-  }, "v2026.05.01.1")), /*#__PURE__*/React.createElement("div", {
+  }, "v2026.05.01.2")), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
