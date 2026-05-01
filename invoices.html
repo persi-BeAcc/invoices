@@ -1286,7 +1286,7 @@ var buildPDF = function buildPDF(inv, settings) {
   ry += 4;
   f("bold", 11);
   c.apply(void 0, _toConsumableArray(C.dark));
-  doc.text("".concat(code, " ").concat(sym).concat(balance.toFixed(2)), rX, ry, {
+  doc.text("".concat(sym).concat(balance.toFixed(2)), rX, ry, {
     align: "right"
   });
   y = Math.max(by + 2, ry + 2) + 4;
@@ -1463,7 +1463,7 @@ var buildPDF = function buildPDF(inv, settings) {
   });
   f("bold", 11);
   c.apply(void 0, _toConsumableArray(C.dark));
-  doc.text("".concat(code, " ").concat(sym).concat(balance.toFixed(2)), tValX, ty, {
+  doc.text("".concat(sym).concat(balance.toFixed(2)), tValX, ty, {
     align: "right"
   });
   y = Math.max(py, ty) + 12;
