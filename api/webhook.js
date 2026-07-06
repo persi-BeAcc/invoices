@@ -1,9 +1,4 @@
-import { createClient } from '@vercel/kv';
-
-const kv = createClient({
-  url: process.env.invoicesSimple_KV_REST_API_URL,
-  token: process.env.invoicesSimple_KV_REST_API_TOKEN,
-});
+import { getRedis } from './_redis.js';
 
 // Send a push notification via ntfy.sh — skipped if NTFY_TOPIC is not set
 async function sendNtfy(title, message, tags = [], priority = '3') {
@@ -56,21 +51,22 @@ export default async function handler(req, res) {
   const key = `email:${emailId}`;
 
   try {
+    const redis = await getRedis();
     if (type === 'email.delivered') {
       // Don't downgrade if already "opened" (events can arrive out of order)
-      const existing = await kv.hgetall(key);
+      const existing = await redis.hGetAll(key);
       if (existing?.status === 'opened') {
-        await kv.hset(key, { deliveredAt: now });
+        await redis.hSet(key, { deliveredAt: now });
       } else {
-        await kv.hset(key, { status: 'delivered', deliveredAt: now });
+        await redis.hSet(key, { status: 'delivered', deliveredAt: now });
       }
       await sendNtfy('Invoice Delivered', `Invoice email delivered to ${data?.to || emailId}`, ['white_check_mark', 'envelope'], '3');
     } else if (type === 'email.opened') {
       // Always upgrade to "opened" — highest status
-      await kv.hset(key, { status: 'opened', openedAt: now });
+      await redis.hSet(key, { status: 'opened', openedAt: now });
       await sendNtfy('Invoice Opened', `Invoice email opened by ${data?.to || emailId}`, ['eyes'], '4');
     } else if (type === 'email.bounced' || type === 'email.complained') {
-      await kv.hset(key, { status: 'failed', failedAt: now });
+      await redis.hSet(key, { status: 'failed', failedAt: now });
     }
     // Other event types (email.sent, email.clicked) are silently accepted
 

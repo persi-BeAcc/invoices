@@ -1,9 +1,4 @@
-import { createClient } from '@vercel/kv';
-
-const kv = createClient({
-  url: process.env.invoicesSimple_KV_REST_API_URL,
-  token: process.env.invoicesSimple_KV_REST_API_TOKEN,
-});
+import { getRedis } from './_redis.js';
 
 // CORS helper
 function cors(res) {
@@ -21,9 +16,13 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: 'Missing ?id= parameter' });
 
   try {
-    const record = await kv.hgetall(`email:${id}`);
+    const redis = await getRedis();
+    const record = await redis.hGetAll(`email:${id}`);
 
-    if (!record) return res.status(200).json({ status: null });
+    // node-redis returns an empty object (not null) for missing keys
+    if (!record || Object.keys(record).length === 0) {
+      return res.status(200).json({ status: null });
+    }
 
     return res.status(200).json({
       status: record.status || null,
